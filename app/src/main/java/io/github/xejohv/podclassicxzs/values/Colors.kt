@@ -37,23 +37,23 @@ object Colors {
         val selText: Int
     )
 
-    /** 暖银 Warm Silver —— 机身 #C9C3B4，暖光下呈香槟金 */
+    /** 暖银 Warm Silver —— 官方机身色 #C9C5BD（浅银灰偏米），与机身严格一致 */
     private val WARM_SILVER = Palette(
-        bg = 0xFFC9AE68.toInt(),
-        bgLight = 0xFFF6EAC0.toInt(),
-        bgDark1 = 0xFFDCC98D.toInt(),
-        bgDark2 = 0xFFC0A961.toInt(),
-        text = 0xFF2A2415.toInt(),
-        textSecondary = 0xFF5A4C22.toInt(),
-        line = 0xFFA08B48.toInt(),
-        divider = 0xFFC4AC66.toInt(),
-        main = 0xFF8C8752.toInt(),
-        mainLight = 0xFFBDB47C.toInt(),
-        mainDark = 0xFF6B6539.toInt(),
+        bg = 0xFFC9C5BD.toInt(),
+        bgLight = 0xFFE9E6E0.toInt(),
+        bgDark1 = 0xFFB3AFA6.toInt(),
+        bgDark2 = 0xFF9B978D.toInt(),
+        text = 0xFF262626.toInt(),
+        textSecondary = 0xFF55524B.toInt(),
+        line = 0xFF8C887F.toInt(),
+        divider = 0xFFB9B5AC.toInt(),
+        main = 0xFF78746B.toInt(),
+        mainLight = 0xFFA9A59B.toInt(),
+        mainDark = 0xFF5B584F.toInt(),
         disc = 0xFFC81E1E.toInt(),
-        discInner = 0xFFB29B54.toInt(),
-        selTop = 0xFF4A4022.toInt(),
-        selBottom = 0xFF2A2415.toInt(),
+        discInner = 0xFFC9C5BD.toInt(),
+        selTop = 0xFF5A5750.toInt(),
+        selBottom = 0xFF34322E.toInt(),
         selText = 0xFFFFFFFF.toInt()
     )
 

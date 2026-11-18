@@ -368,7 +368,7 @@ class TitleBar : FrameLayout {
                     0f,
                     height / 1.8f,
                     Colors.theme_white,
-                    Colors.battery_green
+                    Colors.main
                 )
             }
             canvas.drawRoundRect(
