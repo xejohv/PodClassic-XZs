@@ -89,6 +89,7 @@ object SPManager {
         setBoolean(SP_SHOW_TIME, true)
         setBoolean(SP_SHOW_LYRIC, true)
         setInt(Theme.SP_NAME, Theme.RED.id)
+        setInt(BodyColor.SP_NAME, BodyColor.WARM_SILVER.id)
         setBoolean(SP_SHOW_INFO, false)
         setBoolean(SP_COVER_FLOW, false)
         setInt(NightMode.SP_NAME, NightMode.DISABLE.id)
@@ -171,6 +172,32 @@ object SPManager {
 
         val title get() = Strings.getString(titleId)
 
+    }
+
+    /**
+     * 机身配色：严格按 Sony Xperia XZs 官方发布颜色命名
+     * 暖银 Warm Silver / 暗黑 Black / 冰蓝 Ice Blue / 金桔 Citrus（日本限定）
+     */
+    enum class BodyColor(val id: Int, val cnTitle: String, val enTitle: String) {
+        WARM_SILVER(0, "暖银", "Warm Silver"),
+        BLACK(1, "暗黑", "Black"),
+        ICE_BLUE(2, "冰蓝", "Ice Blue"),
+        CITRUS(3, "金桔", "Citrus");
+
+        companion object {
+            const val SP_NAME = "body_color"
+            const val values = 4
+            fun of(id: Int): BodyColor {
+                return when (id) {
+                    BLACK.id -> BLACK
+                    ICE_BLUE.id -> ICE_BLUE
+                    CITRUS.id -> CITRUS
+                    else -> WARM_SILVER
+                }
+            }
+        }
+
+        val title get() = cnTitle
     }
 
     enum class NightMode(val id: Int, private val titleId: Int) {

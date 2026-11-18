@@ -11,6 +11,7 @@ import android.view.ViewOutlineProvider
 import android.widget.LinearLayout
 import io.github.xejohv.podclassicxzs.base.ScreenView
 import io.github.xejohv.podclassicxzs.view.MainView
+import io.github.xejohv.podclassicxzs.values.Colors
 
 /**
  * iOS 26 风格玻璃效果屏幕容器
@@ -40,7 +41,8 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
         strokeWidth = 2f
     }
 
-    // 背景渐变 - 半透明毛玻璃效果
+    // 背景渐变 - 跟随机身配色（暖银/暗黑/冰蓝/金桔），主题切换后即时重建
+    private var gradientThemeId = Int.MIN_VALUE
     private val glassBackgroundGradient = GradientDrawable(
         GradientDrawable.Orientation.TOP_BOTTOM,
         intArrayOf(
@@ -156,7 +158,20 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
     /**
      * 绘制玻璃背景 - 使用渐变模拟毛玻璃效果
      */
+    private fun syncGradient() {
+        val id = Colors.bodyId
+        if (id == gradientThemeId) {
+            return
+        }
+        gradientThemeId = id
+        val base = Colors.screenGradient
+        glassBackgroundGradient.colors = base.map { c ->
+            Color.argb((255 * 0.99).toInt(), Color.red(c), Color.green(c), Color.blue(c))
+        }.toIntArray()
+    }
+
     private fun drawGlassBackground(canvas: Canvas) {
+        syncGradient()
         // 绘制基础渐变背景
         glassBackgroundGradient.setBounds(0, 0, width, height)
         glassBackgroundGradient.draw(canvas)
@@ -167,7 +182,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
      */
     private fun drawNormalBackground(canvas: Canvas) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = Color.rgb(210, 190, 130)
+        paint.color = Colors.screen
         canvas.drawRoundRect(
             0f, 0f, width.toFloat(), height.toFloat(),
             cornerRadius, cornerRadius, paint

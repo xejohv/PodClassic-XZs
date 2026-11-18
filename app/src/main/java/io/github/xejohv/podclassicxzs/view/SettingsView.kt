@@ -13,6 +13,7 @@ import io.github.xejohv.podclassicxzs.media.RepeatMode
 import io.github.xejohv.podclassicxzs.service.MediaPresenter
 import io.github.xejohv.podclassicxzs.storage.SPManager
 import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
+import io.github.xejohv.podclassicxzs.values.Colors
 import io.github.xejohv.podclassicxzs.values.Strings
 import io.github.xejohv.podclassicxzs.values.Values
 import io.github.xejohv.podclassicxzs.widget.RecyclerListView
@@ -315,33 +316,12 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
             ),
 
             Item(
-                Strings.THEME, object : OnItemClickListener {
+                "机身配色", object : OnItemClickListener {
                     override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                        val themeId = SPManager.getInt(SPManager.Theme.SP_NAME)
-                        SPManager.setInt(
-                            SPManager.Theme.SP_NAME,
-                            (themeId + 1) % SPManager.Theme.values
-                        )
-                        Core.refresh()
-                        // 重新绑定控制器，确保主题切换后控制器仍然可以触摸
-                        (context as? MainActivity)?.rebindController()
-                        listView.getCurrentItem().rightText =
-                            when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
-                                SPManager.Theme.RED.id -> SPManager.Theme.RED.title
-                                SPManager.Theme.BLACK.id -> SPManager.Theme.BLACK.title
-                                SPManager.Theme.WHITE.id -> SPManager.Theme.WHITE.title
-                                SPManager.Theme.IPOD_3RD.id -> SPManager.Theme.IPOD_3RD.title
-                                else -> ""
-                            }
+                        Core.addView(ThemeView(context))
                         return true
                     }
-                }, when (SPManager.getInt(SPManager.Theme.SP_NAME)) {
-                    SPManager.Theme.RED.id -> SPManager.Theme.RED.title
-                    SPManager.Theme.BLACK.id -> SPManager.Theme.BLACK.title
-                    SPManager.Theme.WHITE.id -> SPManager.Theme.WHITE.title
-                    SPManager.Theme.IPOD_3RD.id -> SPManager.Theme.IPOD_3RD.title
-                    else -> ""
-                }
+                }, SPManager.BodyColor.of(Colors.bodyId).cnTitle
             ),
 
             SwitchBar(Strings.SHOW_LYRIC, SPManager.SP_SHOW_LYRIC),

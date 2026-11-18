@@ -1,5 +1,7 @@
 package io.github.xejohv.podclassicxzs.game
 
+import io.github.xejohv.podclassicxzs.values.Colors
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -42,10 +44,10 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
         const val BAR_NONE = 2
 
         private val BEST = HashMap<String, Int>()
-        protected const val COLOR_BG = 0xFFE8D69C.toInt()
-        protected const val COLOR_INK = 0xFF2E2514.toInt()
-        protected const val COLOR_ACCENT = 0xFF8C7A3B.toInt()
-        protected const val COLOR_DEEP = 0xFF1F1A0E.toInt()
+        protected val COLOR_BG: Int get() = Colors.gameBg
+        protected val COLOR_INK: Int get() = Colors.gameInk
+        protected val COLOR_ACCENT: Int get() = Colors.gameAccent
+        protected val COLOR_DEEP: Int get() = Colors.gameDeep
     }
 
     /** 操作条上的一个按钮：标签 + 点击动作 + 长按动作（可选） */

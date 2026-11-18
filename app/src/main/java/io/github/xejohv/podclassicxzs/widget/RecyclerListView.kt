@@ -779,11 +779,11 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             if (highlight) {
                 // 应用玻璃效果高亮背景
                 applyHighlightGlassEffect()
-                leftText.setTextColor(0xFFFFFFFF.toInt())
-                rightText.setTextColor(0xFFFFFFFF.toInt())
+                leftText.setTextColor(Colors.selected_text)
+                rightText.setTextColor(Colors.selected_text)
             } else {
                 background = null
-                leftText.setTextColor(0xFF2A2415.toInt())
+                leftText.setTextColor(Colors.text)
                 rightText.setTextColor(Colors.text)
             }
         }
@@ -796,8 +796,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 cornerRadius = 8f * context.resources.displayMetrics.density
                 // 深褐黑选中条，配白字，在金色背景上对比明显
                 colors = intArrayOf(
-                    Color.argb(235, 74, 64, 34),
-                    Color.argb(230, 38, 32, 14)
+                    Colors.ipod_selected_top,
+                    Colors.ipod_selected_bottom
                 )
                 orientation = GradientDrawable.Orientation.TOP_BOTTOM
             }
@@ -885,8 +885,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             playing = false
 
             background = null
-            leftText.setTextColor(0xFF2A2415.toInt())
-            rightText.setTextColor(0xFF2A2415.toInt())
+            leftText.setTextColor(Colors.text)
+            rightText.setTextColor(Colors.text)
         }
     }
 }

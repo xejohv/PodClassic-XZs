@@ -90,6 +90,14 @@ class AppsView(context: Context) : ItemListView(
         }
     }, true)
 
+    // 机身配色入口：四色严格按官方发布颜色命名
+    private val themeItem = Item("主题", object : OnItemClickListener {
+        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+            Core.addView(ThemeView(context))
+            return true
+        }
+    }, true)
+
     // 蓝牙设置入口（单实例，重复进页也不会重复添加）
     private val btItem = Item("蓝牙", object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
@@ -126,6 +134,7 @@ class AppsView(context: Context) : ItemListView(
         }
 
         rows.add(btItem)
+        rows.add(themeItem)
         itemList = rows
     }
 

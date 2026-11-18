@@ -43,7 +43,7 @@ object Icons {
         val canvas = Canvas(bmp)
         canvas.drawColor(Color.TRANSPARENT)
         val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-        p.color = 0xFF2E2514.toInt()
+        p.color = Colors.text
         val s = size.toFloat()
         // 音符头（椭圆）
         canvas.drawOval(

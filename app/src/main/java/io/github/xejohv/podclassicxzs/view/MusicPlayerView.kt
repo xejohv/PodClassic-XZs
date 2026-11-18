@@ -88,6 +88,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     init {
         Log.d("MusicPlayerView", "Init started")
         val view = LayoutInflater.from(context).inflate(R.layout.view_player, this, true)
+        // 播放页底色跟随机身配色（XML 里的静态色在这里统一覆盖）
+        setBackgroundColor(Colors.screen)
         album = view.findViewById(R.id.tv_album)
         artist = view.findViewById(R.id.tv_artist)
         title = view.findViewById(R.id.tv_title)

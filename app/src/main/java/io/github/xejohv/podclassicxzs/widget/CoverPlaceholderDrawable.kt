@@ -23,12 +23,12 @@ class CoverPlaceholderDrawable(
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val notePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.rgb(0xE8, 0xDF, 0xAF)
+        color = Colors.coverPlaceholderBg
     }
     private val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 1.2f * density
-        color = Color.argb(0x4D, 0xC9, 0xAE, 0x68)
+        color = Colors.main
     }
     private val path = Path()
 

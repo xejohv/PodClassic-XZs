@@ -10,8 +10,8 @@ android {
         applicationId "io.github.xejohv.podclassicxzs"
         minSdk 26
         targetSdk 34
-        versionCode 92
-        versionName "1.5.17"
+        versionCode 93
+        versionName "1.5.18"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
