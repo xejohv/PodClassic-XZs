@@ -19,6 +19,8 @@
     <!-- 蓝牙权限（用于蓝牙耳机控制） -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     
     <!-- 查询权限 -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
@@ -28,9 +30,12 @@
     <uses-permission android:name="android.permission.GET_TASKS"
         android:maxSdkVersion="29" />
 
+    <!-- 状态栏管控：允许收起通知栏，做到任何界面都不显示状态栏 -->
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+
 
     <application
-        android:name="com.example.podclassic.base.BaseApplication"
+        android:name="io.github.xejohv.podclassicxzs.base.BaseApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -41,14 +46,14 @@
 
         <!-- 媒体播放服务 -->
         <service
-            android:name="com.example.podclassic.service.MediaService"
+            android:name="io.github.xejohv.podclassicxzs.service.MediaService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback"
             android:stopWithTask="false" />
 
         <receiver
-            android:name="com.example.podclassic.service.MediaBroadcastReceiver"
+            android:name="io.github.xejohv.podclassicxzs.service.MediaBroadcastReceiver"
             android:exported="true">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
@@ -59,7 +64,7 @@
         </receiver>
 
         <receiver
-            android:name="com.example.podclassic.widget.PodShuffleWidget"
+            android:name="io.github.xejohv.podclassicxzs.widget.PodShuffleWidget"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -72,13 +77,13 @@
 
 
         <activity
-            android:name="com.example.podclassic.activity.MainActivity"
+            android:name="io.github.xejohv.podclassicxzs.activity.MainActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:launchMode="singleTask"
             android:resizeableActivity="false"
             android:roundIcon="@mipmap/ic_launcher"
-            android:screenOrientation="unspecified"
+            android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
             >
             <!--android:excludeFromRecents="true" -->
@@ -118,6 +123,21 @@
                 android:resource="@xml/shortcuts" />
 
         </activity>
+
+            <!-- 内置手势层 + 状态栏管控（原 PodGestures 独立 APK 已合并） -->
+        <service
+            android:name="io.github.xejohv.podclassicxzs.gestures.GestureService"
+            android:enabled="true"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/pod_gesture_config" />
+        </service>
 
     </application>
 </manifest>

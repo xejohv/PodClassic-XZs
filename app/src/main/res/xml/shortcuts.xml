@@ -9,8 +9,8 @@
 
         <intent
             android:action="action_shuffle"
-            android:targetClass="com.example.podclassic.activity.MainActivity"
-            android:targetPackage="com.example.podclassic" />
+            android:targetClass="io.github.xejohv.podclassicxzs.activity.MainActivity"
+            android:targetPackage="io.github.xejohv.podclassicxzs" />
         <categories android:name="android.shortcut.conversation" />
     </shortcut>
 </shortcuts>

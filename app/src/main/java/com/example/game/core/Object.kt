@@ -1,7 +1,7 @@
 package com.example.game.core
 
 import android.view.View
-import com.example.podclassic.values.Values
+import io.github.xejohv.podclassicxzs.values.Values
 import kotlin.random.Random
 
 class Object(val view: View, var x: Int, var y: Int, var width: Int, var height: Int) {

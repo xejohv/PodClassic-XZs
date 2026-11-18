@@ -1,0 +1,340 @@
+package io.github.xejohv.podclassicxzs.service
+
+import android.content.ComponentName
+import android.content.Context.BIND_AUTO_CREATE
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
+import io.github.xejohv.podclassicxzs.base.BaseApplication
+import io.github.xejohv.podclassicxzs.bean.Music
+import io.github.xejohv.podclassicxzs.media.PlayMode
+import io.github.xejohv.podclassicxzs.media.PlayState
+import io.github.xejohv.podclassicxzs.media.RepeatMode
+import io.github.xejohv.podclassicxzs.util.LiveData
+
+
+object MediaPresenter {
+    val music = LiveData<Music?>(null)
+    val playState = LiveData<PlayState>(null)
+    val playMode = LiveData(PlayMode.ORDER)
+    val repeatMode = LiveData(RepeatMode.ALL)
+    val stopTime = LiveData(0)
+    val playList = LiveData<ArrayList<Music>>(null)
+
+
+    private const val STATE_UNCONNECTED = 0
+    private const val STATE_CONNECTING = 1
+    private const val STATE_CONNECTED = 2
+
+    private var connectionState = STATE_UNCONNECTED
+
+    private var mediaController: MediaService.MediaController? = null
+        get() {
+            if (field == null) {
+                connect()
+            }
+            return field
+        }
+
+    fun init() {
+
+        //connectService()
+    }
+
+    private fun connect() {
+        if (connectionState == STATE_CONNECTING) {
+            return
+        }
+        connectionState = STATE_CONNECTING
+
+        val context = BaseApplication.context
+        val intent = Intent(context, MediaService::class.java)
+
+        context.bindService(intent, object : ServiceConnection {
+            override fun onServiceConnected(p0: ComponentName?, p1: IBinder?) {
+                val binder = p1 as MediaService.ServiceBinder
+                mediaController = binder.mediaController
+                connectionState = STATE_CONNECTED
+            }
+
+            override fun onServiceDisconnected(p0: ComponentName?) {
+                mediaController = null
+                connectionState = STATE_UNCONNECTED
+            }
+
+        }, BIND_AUTO_CREATE)
+    }
+
+
+    init {
+        connect()
+    }
+
+    private fun sendMessage(action: String, arg1: Any? = null, arg2: Any? = null) {
+        // 首先尝试通过绑定的控制器发送消息
+        if (mediaController != null) {
+            mediaController?.sendMessage(action, arg1, arg2)
+        } else {
+            // 如果服务未绑定，使用 startService 启动服务并传递动作
+            android.util.Log.d("MediaPresenter", "Service not bound, starting service with action: $action")
+            val context = BaseApplication.context
+            val intent = Intent(context, MediaService::class.java).apply {
+                this.action = action
+            }
+            try {
+                context.startService(intent)
+            } catch (e: Exception) {
+                // Android 8.0+ 后台限制，尝试使用 startForegroundService
+                try {
+                    context.startForegroundService(intent)
+                } catch (e2: Exception) {
+                    android.util.Log.e("MediaPresenter", "Failed to start service: ${e2.message}")
+                }
+            }
+        }
+    }
+
+    fun next() {
+        sendMessage(MediaService.ACTION_NEXT)
+    }
+
+    fun prev() {
+        sendMessage(MediaService.ACTION_PREV)
+    }
+
+    fun playPause() {
+        sendMessage(MediaService.ACTION_PLAY_PAUSE)
+    }
+
+    fun play() {
+        sendMessage(MediaService.ACTION_PLAY)
+    }
+
+    fun pause() {
+        sendMessage(MediaService.ACTION_PAUSE)
+    }
+
+    fun seekTo(position: Int) {
+        sendMessage(MediaService.ACTION_SEEK, position)
+    }
+
+    fun setPlayMode(playMode: PlayMode) {
+        sendMessage(MediaService.ACTION_SET_PLAY_MODE, playMode)
+    }
+
+    fun nextPlayMode() {
+        sendMessage(MediaService.ACTION_NEXT_PLAY_MODE)
+    }
+
+    fun setRepeatMode(repeatMode: RepeatMode) {
+        sendMessage(MediaService.ACTION_SET_REPEAT_MODE, repeatMode)
+    }
+
+    fun shufflePlay(list: ArrayList<Music>) {
+        sendMessage(MediaService.ACTION_SHUFFLE, list)
+    }
+
+    fun shufflePlay(list: ArrayList<Music>, index: Int) {
+        sendMessage(MediaService.ACTION_SHUFFLE, list, index)
+    }
+
+    fun shufflePlay() {
+        sendMessage(MediaService.ACTION_SHUFFLE)
+    }
+
+    fun setEqualizer(index: Int) {
+        sendMessage(MediaService.ACTION_SET_EQUALIZER, index)
+    }
+
+    fun stop() {
+        sendMessage(MediaService.ACTION_STOP)
+    }
+
+    fun add(e: Music) {
+        sendMessage(MediaService.ACTION_ADD_MUSIC, e)
+    }
+
+    fun set(e: Music) {
+        sendMessage(MediaService.ACTION_SET_MUSIC, e)
+    }
+
+    fun remove(e: Music) {
+        sendMessage(MediaService.ACTION_REMOVE_MUSIC, e)
+    }
+
+    fun removeAt(index: Int) {
+        sendMessage(MediaService.ACTION_REMOVE_MUSIC_AT, index)
+    }
+
+    fun setIndex(index: Int) {
+        sendMessage(MediaService.ACTION_SET_INDEX, index)
+    }
+
+    fun setPlaylist(list: ArrayList<Music>) {
+        sendMessage(MediaService.ACTION_SET_PLAY_LIST, list)
+    }
+
+    fun setPlaylist(list: ArrayList<Music>, index: Int) {
+        sendMessage(MediaService.ACTION_SET_PLAY_LIST, list, index)
+    }
+
+    fun setStopTime(time: Int) {
+        sendMessage(MediaService.ACTION_SET_STOP_TIME, time)
+    }
+
+
+    fun getIndex(): Int {
+        return mediaController?.getIndex() ?: -1
+    }
+
+    fun getCurrent(): Music? {
+        return mediaController?.getCurrent()
+    }
+
+    fun forward(): Boolean {
+        return mediaController?.forward() ?: false
+    }
+
+    fun backward(): Boolean {
+        return mediaController?.backward() ?: false
+    }
+
+    fun getDuration(): Int {
+        mediaController?.getDuration().apply {
+            return if (this == null || this == 0) {
+                1
+            } else {
+                this
+            }
+        }
+    }
+
+    fun getProgress(): Int {
+        return mediaController?.getProgress() ?: 0
+    }
+
+    fun getPlayMode(): PlayMode {
+        return mediaController?.getPlayMode() ?: PlayMode.ORDER
+    }
+
+    fun getRepeatMode(): RepeatMode {
+        return mediaController?.getRepeatMode() ?: RepeatMode.ALL
+    }
+
+    fun nextRepeatMode() {
+        sendMessage(MediaService.ACTION_NEXT_REPEAT_MODE)
+
+    }
+
+    fun getStopTime(): Int {
+        return mediaController?.getStopTime() ?: 0
+    }
+
+    fun isPlaying(): Boolean {
+        return mediaController?.isPlaying() ?: false
+    }
+
+    fun isPrepared(): Boolean {
+        return mediaController?.isPrepared() ?: false
+    }
+
+    fun getPresetList(): Array<String?> {
+        return mediaController?.getPresetList() ?: arrayOf()
+    }
+
+    fun getPlaylist(): ArrayList<Music> {
+        return mediaController?.getPlaylist() ?: arrayListOf()
+    }
+
+    fun setAudioFocus() {
+        sendMessage(MediaService.ACTION_UPDATE_AUDIO_FOCUS)
+    }
+
+    fun setAgcEnabled() {
+        sendMessage(MediaService.ACTION_SET_AGC_ENABLED)
+    }
+
+    fun setTomSteadyEnabled() {
+        sendMessage(MediaService.ACTION_SET_TOM_STEADY_ENABLED)
+    }
+
+    fun setTomSteadyParameters(
+        targetLevel: Float? = null,
+        maxGain: Float? = null,
+        minGain: Float? = null,
+        attackTime: Float? = null,
+        releaseTime: Float? = null
+    ) {
+        // 创建一个包含所有参数的map
+        val params = mapOf(
+            "targetLevel" to targetLevel,
+            "maxGain" to maxGain,
+            "minGain" to minGain,
+            "attackTime" to attackTime,
+            "releaseTime" to releaseTime
+        )
+        sendMessage(MediaService.ACTION_SET_TOM_STEADY_PARAMETERS, params, null)
+    }
+
+    fun initTomSteadyProcessor() {
+        sendMessage(MediaService.ACTION_INIT_TOM_STEADY)
+    }
+
+    // 胆机音效相关方法
+    fun setTubeAmpEnabled() {
+        sendMessage(MediaService.ACTION_SET_TUBE_AMP_ENABLED)
+    }
+
+    fun setTubeAmpParameters(
+        gain: Float? = null,
+        saturation: Float? = null,
+        harmonics: Float? = null,
+        ratio: Float? = null,
+        attack: Float? = null,
+        release: Float? = null,
+        warmth: Float? = null
+    ) {
+        val params = mapOf(
+            "gain" to gain,
+            "saturation" to saturation,
+            "harmonics" to harmonics,
+            "ratio" to ratio,
+            "attack" to attack,
+            "release" to release,
+            "warmth" to warmth
+        )
+        sendMessage(MediaService.ACTION_SET_TUBE_AMP_PARAMETERS, params, null)
+    }
+
+    fun applyTubeAmpPreset(preset: io.github.xejohv.podclassicxzs.media.TubeAmpPreset) {
+        sendMessage(MediaService.ACTION_SET_TUBE_AMP_PRESET, preset)
+    }
+
+    // DC Phase Linearizer 相关方法
+    fun setDCPhaseEnabled() {
+        sendMessage(MediaService.ACTION_SET_DC_PHASE_ENABLED)
+    }
+
+    fun setDCPhaseParameters(
+        strength: Float? = null,
+        lowDelay: Float? = null,
+        midDelay: Float? = null,
+        highDelay: Float? = null,
+        crossover: Float? = null,
+        highCrossover: Float? = null
+    ) {
+        val params = mapOf(
+            "strength" to strength,
+            "lowDelay" to lowDelay,
+            "midDelay" to midDelay,
+            "highDelay" to highDelay,
+            "crossover" to crossover,
+            "highCrossover" to highCrossover
+        )
+        sendMessage(MediaService.ACTION_SET_DC_PHASE_PARAMETERS, params, null)
+    }
+
+    fun applyDCPhasePreset(preset: io.github.xejohv.podclassicxzs.media.DCPhasePreset) {
+        sendMessage(MediaService.ACTION_SET_DC_PHASE_PRESET, preset)
+    }
+}  

@@ -4,8 +4,8 @@ import android.content.Context
 import android.graphics.LinearGradient
 import android.graphics.Shader
 import androidx.core.content.ContextCompat
-import com.example.podclassic.R
-import com.example.podclassic.base.BaseApplication
+import io.github.xejohv.podclassicxzs.R
+import io.github.xejohv.podclassicxzs.base.BaseApplication
 
 object Colors {
     val context: Context by lazy { BaseApplication.context }

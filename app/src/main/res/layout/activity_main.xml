@@ -11,20 +11,20 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_margin="@dimen/padding_0"
+        android:layout_margin="0dp"
         android:orientation="vertical">
 
         <FrameLayout
             android:id="@+id/layout_rectangle"
             android:layout_width="match_parent"
             android:layout_height="380dp"
-            android:layout_marginLeft="@dimen/padding_1"
-            android:layout_marginRight="@dimen/padding_1"
+            android:layout_marginLeft="0dp"
+            android:layout_marginRight="0dp"
             android:background="@drawable/round_rectangle"
-            android:padding="@dimen/padding_0">
+            android:padding="0dp">
 
 
-            <com.example.podclassic.widget.Screen
+            <io.github.xejohv.podclassicxzs.widget.Screen
                 android:id="@+id/screen"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
@@ -32,12 +32,12 @@
         </FrameLayout>
 
 
-        <com.example.podclassic.widget.SlideController
+        <io.github.xejohv.podclassicxzs.widget.SlideController
             android:id="@+id/slide_controller"
             android:layout_width="match_parent"
             android:layout_height="280dp" />
         
-        <com.example.podclassic.widget.SlideController3rd
+        <io.github.xejohv.podclassicxzs.widget.SlideController3rd
             android:id="@+id/slide_controller_3rd"
             android:layout_width="match_parent"
             android:layout_height="280dp"

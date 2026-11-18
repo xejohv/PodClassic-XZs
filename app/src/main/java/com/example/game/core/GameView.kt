@@ -7,7 +7,7 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.ViewGroup
 import com.example.game.util.Colors
-import com.example.podclassic.util.ThreadUtil
+import io.github.xejohv.podclassicxzs.util.ThreadUtil
 import java.util.*
 
 class GameView : ViewGroup {

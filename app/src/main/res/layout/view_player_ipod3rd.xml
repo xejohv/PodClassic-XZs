@@ -71,7 +71,7 @@
         android:clipToPadding="false">
 
         <!-- 专辑封面 - 靠左上显示，使用带倒影的图片 -->
-        <com.example.podclassic.widget.ImageView
+        <io.github.xejohv.podclassicxzs.widget.ImageView
             android:id="@+id/image"
             android:layout_width="160dp"
             android:layout_height="200dp"
@@ -145,7 +145,7 @@
                 android:gravity="start" />
 
             <!-- 歌词 -->
-            <com.example.podclassic.widget.TextView
+            <io.github.xejohv.podclassicxzs.widget.TextView
                 android:id="@+id/tv_lyric"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -187,7 +187,7 @@
             android:padding="0dp" />
 
         <!-- 进度条 -->
-        <com.example.podclassic.widget.ScreenLayout
+        <io.github.xejohv.podclassicxzs.widget.ScreenLayout
             android:id="@+id/seek_bar"
             android:layout_width="0dp"
             android:layout_height="wrap_content"

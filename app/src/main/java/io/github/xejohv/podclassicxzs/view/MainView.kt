@@ -1,0 +1,1289 @@
+package io.github.xejohv.podclassicxzs.view
+
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.content.Context
+import android.content.res.Configuration
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.os.Message
+import android.view.View
+import android.view.animation.LinearInterpolator
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.RelativeLayout
+import android.widget.RelativeLayout.LayoutParams
+import io.github.xejohv.podclassicxzs.base.Core
+import io.github.xejohv.podclassicxzs.base.Observer
+import io.github.xejohv.podclassicxzs.base.ScreenView
+import io.github.xejohv.podclassicxzs.bean.Music
+import io.github.xejohv.podclassicxzs.service.MediaPresenter
+import io.github.xejohv.podclassicxzs.storage.SPManager
+import io.github.xejohv.podclassicxzs.util.LiveData
+import io.github.xejohv.podclassicxzs.util.ThreadUtil
+import io.github.xejohv.podclassicxzs.util.FileUtil
+import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
+import io.github.xejohv.podclassicxzs.values.Colors
+import io.github.xejohv.podclassicxzs.values.Strings
+import io.github.xejohv.podclassicxzs.view.MusicPlayerView3rd
+import io.github.xejohv.podclassicxzs.widget.RecyclerListView
+import java.io.File
+import java.util.*
+
+
+class MainView(context: Context) : RelativeLayout(context), ScreenView {
+
+    private val listView = RecyclerListView(context)
+    // 图片容器（可见区域）
+    private val coverContainer = FrameLayout(context)
+    // 专辑封面动画图片视图 - 在容器内缓慢飘动展示
+    private val coverImageView = ImageView(context).apply {
+        contentDescription = "Animated Album Cover"
+    }
+    // 分割线视图
+    private lateinit var dividerView: View
+
+    // 保存容器和图片的尺寸
+    private var savedContainerWidth = 0
+    private var savedContainerHeight = 0
+    private var savedImageWidth = 0
+    private var savedImageHeight = 0
+
+    /**
+     * 记忆设备高度数据类
+     * - portraitHeight: 竖屏时的容器高度
+     * - landscapeHeight: 横屏时的容器高度
+     * - measuredPortrait: 是否已测量竖屏高度
+     * - measuredLandscape: 是否已测量横屏高度
+     * 注意：宽度实时计算，不记忆（因为横竖屏的dividerPosition不同）
+     */
+    private data class DeviceDimensions(
+        val portraitHeight: Int = 0,
+        val landscapeHeight: Int = 0,
+        val measuredPortrait: Boolean = false,
+        val measuredLandscape: Boolean = false
+    )
+
+    private var deviceDimensions = DeviceDimensions()
+
+    private val random = Random()
+    private val coverImages = arrayOf("img/1.jpg", "img/2.jpg", "img/3.jpg", "img/4.jpg", "img/5.jpg", "img/6.jpg")
+
+    // 动画相关
+    private var xAnimator: ObjectAnimator? = null
+    private var yAnimator: ObjectAnimator? = null
+    private var isAnimating = false
+    
+    // 蛇形扫描算法相关
+    private var scanGridCols = 3  // 网格列数
+    private var scanGridRows = 3  // 网格行数
+    private var currentGridX = 0  // 当前网格X索引
+    private var currentGridY = 0  // 当前网格Y索引
+    private var scanDirectionX = 1 // X方向扫描方向：1为右，-1为左
+    private var scanDirectionY = 1 // Y方向扫描方向：1为下，-1为上
+    private var isHorizontalScan = true // 是否以横向扫描为主
+    private val visitedGrids = mutableSetOf<Pair<Int, Int>>() // 记录已访问的网格
+
+    // Global layout listener to track layout completion
+    private var globalLayoutListener: android.view.ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var isLayoutPending = false
+
+    // Orientation change handling - prevent rapid consecutive orientation changes
+    private var orientationChangeHandler: Runnable? = null
+    private val orientationChangeLock = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var lastKnownParentWidth = 0
+    private var lastKnownOrientation = Configuration.ORIENTATION_PORTRAIT
+    private val handler = Handler(Looper.getMainLooper())
+
+    /**
+     * 测量并存储当前方向的容器高度
+     * 只在第一次进入该方向时调用，之后使用记忆值
+     * 注意：宽度实时计算，不记忆（因为横竖屏的dividerPosition不同）
+     */
+    private fun measureAndStoreDimensions() {
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        // 等待布局完成后再测量
+        waitForLayout {
+            val containerHeight = coverContainer.height
+
+            if (containerHeight <= 0) {
+                android.util.Log.w("MainView", "Invalid container height: $containerHeight, retrying...")
+                post { measureAndStoreDimensions() }
+                return@waitForLayout
+            }
+
+            if (isLandscape) {
+                // 记录横屏高度
+                deviceDimensions = deviceDimensions.copy(
+                    landscapeHeight = containerHeight,
+                    measuredLandscape = true
+                )
+                // 推导竖屏高度（高度可以直接互换）
+                deviceDimensions = deviceDimensions.copy(
+                    portraitHeight = containerHeight
+                )
+                android.util.Log.d("MainView", "Measured LANDSCAPE height: $containerHeight, derived PORTRAIT height: $containerHeight")
+            } else {
+                // 记录竖屏高度
+                deviceDimensions = deviceDimensions.copy(
+                    portraitHeight = containerHeight,
+                    measuredPortrait = true
+                )
+                // 推导横屏高度（高度可以直接互换）
+                deviceDimensions = deviceDimensions.copy(
+                    landscapeHeight = containerHeight
+                )
+                android.util.Log.d("MainView", "Measured PORTRAIT height: $containerHeight, derived LANDSCAPE height: $containerHeight")
+            }
+        }
+    }
+
+    /**
+     * 获取容器高度 - 优先使用记忆值
+     */
+    private fun getActualContainerHeight(): Int {
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        // 优先级1: 使用记忆值（已测量或推导）
+        val memorizedHeight = if (isLandscape) deviceDimensions.landscapeHeight else deviceDimensions.portraitHeight
+        if (memorizedHeight > 0) {
+            android.util.Log.d("MainView", "getActualContainerHeight: using memorized $memorizedHeight (${if(isLandscape) "LANDSCAPE" else "PORTRAIT"})")
+            return memorizedHeight
+        }
+
+        // 优先级2: 使用实际测量值
+        if (coverContainer.height > 0) {
+            android.util.Log.d("MainView", "getActualContainerHeight: using actual ${coverContainer.height}")
+            return coverContainer.height
+        }
+
+        // 优先级3: 父容器高度（可靠）
+        val parent = parent as? android.view.ViewGroup
+        if (parent != null && parent.height > 0) {
+            android.util.Log.d("MainView", "getActualContainerHeight: using parent ${parent.height}")
+            return parent.height
+        }
+
+        // 优先级4: 屏幕高度估算（仅作后备）
+        val screenHeight = resources.displayMetrics.heightPixels
+        val estimatedHeight = (screenHeight * 0.9).toInt()
+        android.util.Log.d("MainView", "getActualContainerHeight: using estimated $estimatedHeight")
+        return estimatedHeight
+    }
+
+    /**
+     * 获取容器宽度 - 实时计算（不记忆）
+     * 公式：screenWidth - dividerPosition
+     */
+    private fun getActualContainerWidth(): Int {
+        val screenWidth = resources.displayMetrics.widthPixels
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val dividerPosition = if (isLandscape) (screenWidth * 0.45).toInt() else (screenWidth * 0.30).toInt()
+        val calculatedWidth = screenWidth - dividerPosition
+
+        // 优先级1: 使用实际测量值（如果合理）
+        if (coverContainer.width > 0) {
+            val widthRatio = coverContainer.width.toFloat() / calculatedWidth
+            if (widthRatio in 0.9f..1.1f) {
+                android.util.Log.d("MainView", "getActualContainerWidth: using actual ${coverContainer.width}")
+                return coverContainer.width
+            }
+        }
+
+        // 优先级2: 使用计算值
+        android.util.Log.d("MainView", "getActualContainerWidth: using calculated $calculatedWidth")
+        return calculatedWidth
+    }
+
+    /**
+     * 获取状态栏高度
+     */
+    private fun getStatusBarHeight(): Int {
+        var result = 0
+        val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+        if (resourceId > 0) {
+            result = resources.getDimensionPixelSize(resourceId)
+        }
+        return result
+    }
+
+    init {
+        // 启用硬件加速
+        coverImageView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+    }
+
+    override fun getTitle(): String? {
+        return if (SPManager.getBoolean(
+                SPManager.SP_SHOW_TIME
+            )
+        ) {
+            null
+        } else {
+            Strings.iPod
+        }
+    }
+
+    val item = RecyclerListView.Item(Strings.NOW_PLAYING, object : RecyclerListView.OnItemClickListener {
+        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+            if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
+                Core.addView(MusicPlayerView3rd(context))
+            } else {
+                Core.addView(MusicPlayerView(context))
+            }
+            return true
+        }
+
+        override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+            return false
+        }
+    }, true)
+
+    // Observer for real-time music state monitoring
+    private val observer = Observer()
+
+    init {
+        // 检查是否是横屏模式
+        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        // 使用屏幕宽度，避免依赖可能不稳定的 parent
+        val screenWidth = resources.displayMetrics.widthPixels
+
+        // 计算分割线位置（ListView宽度）
+        val dividerPosition = if (isLandscape) {
+            (screenWidth * 0.45).toInt() // 横屏时占45%
+        } else {
+            (screenWidth * 0.30).toInt() // 竖屏时占30%
+        }
+
+        // 设置图片容器（可见区域）- 从分割线右侧开始到屏幕右边
+        savedContainerWidth = screenWidth - dividerPosition
+        // 使用智能高度估算（考虑标题栏和系统UI）
+        savedContainerHeight = getActualContainerHeight()
+
+        // 保存初始状态
+        lastKnownParentWidth = screenWidth
+        lastKnownOrientation = if (isLandscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+
+        val containerParams = LayoutParams(savedContainerWidth, LayoutParams.MATCH_PARENT)
+        containerParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
+        containerParams.addRule(RelativeLayout.ALIGN_PARENT_TOP)
+        addView(coverContainer, containerParams)
+        coverContainer.setBackgroundColor(android.graphics.Color.BLACK)
+
+        // 设置图片视图的初始布局参数，实际尺寸将在图片加载后根据比例计算
+        val imageParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+        coverImageView.layoutParams = imageParams
+        coverImageView.scaleType = ImageView.ScaleType.CENTER_CROP  // 尺寸按等比计算，用 CROP 兜底避免拉伸
+        coverContainer.addView(coverImageView)
+        android.util.Log.d("MainView", "CoverImageView added to container, width: $savedContainerWidth")
+
+        // 设置ListView
+        val listParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+        listParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
+        listParams.width = dividerPosition
+        // 设置ListView的z轴顺序，使其位于ImageView上方
+        listParams.addRule(RelativeLayout.ABOVE, -1)
+        addView(listView, listParams)
+        // 设置ListView的背景为浅灰色，防止专辑图透出影响文字阅读
+        listView.setBackgroundColor(Colors.background)
+
+        // 添加中间竖线分割，右侧横向内阴影效果
+        dividerView = object : View(context) {
+            private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+            private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+            init {
+                // 设置透明背景
+                setBackgroundColor(Color.TRANSPARENT)
+            }
+
+            override fun onDraw(canvas: Canvas) {
+                val width = width.toFloat()
+                val height = height.toFloat()
+
+                // 绘制右侧内阴影（从中间到右边缘，由黑到透明）
+                val rightShadow = LinearGradient(
+                    width * 0.1f, 0f,
+                    width, 0f,
+                    intArrayOf(
+                        Color.argb(240, 0, 0, 0),    // 左侧很黑的阴影
+                        Color.argb(120, 0, 0, 0),    // 过渡
+                        Color.argb(40, 0, 0, 0),     // 中间
+                        Color.argb(0, 0, 0, 0)       // 右边缘透明
+                    ),
+                    floatArrayOf(0f, 0.3f, 0.6f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+                shadowPaint.shader = rightShadow
+                canvas.drawRect(width * 0.1f, 0f, width, height, shadowPaint)
+            }
+        }
+        val dividerParams = LayoutParams(48, LayoutParams.MATCH_PARENT)
+        dividerParams.addRule(RelativeLayout.ALIGN_PARENT_LEFT)
+        dividerParams.leftMargin = dividerPosition - 2 // 分割线向左微调2像素
+        addView(dividerView, dividerParams)
+
+        // 初始化菜单项
+        val menuItems = arrayListOf(
+            RecyclerListView.Item(Strings.SONG, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    Core.addView(MusicView(context))
+                    return true
+                }
+
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                    return false
+                }
+            }, true),
+            RecyclerListView.Item(Strings.PHOTO, object : RecyclerListView.OnItemClickListener {
+                val list by lazy { MediaStoreUtil.getPhotoList() }
+                private fun getItemList(): ArrayList<RecyclerListView.Item> {
+                    val itemList = ArrayList<RecyclerListView.Item>()
+                    for (file in list) {
+                        itemList.add(RecyclerListView.Item(file.name, null, false))
+                    }
+                    return itemList
+                }
+
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    Core.addView(
+                        ItemListView(
+                            context,
+                            getItemList(),
+                            Strings.PHOTO,
+                            object : RecyclerListView.OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    Core.addView(ImageView(context, list, index))
+                                    return true
+                                }
+
+                                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                                    return false
+                                }
+                            })
+                    )
+                    return true
+                }
+
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                    return false
+                }
+            }, true),
+            RecyclerListView.Item(Strings.VIDEO, object : RecyclerListView.OnItemClickListener {
+                val list by lazy { MediaStoreUtil.getVideoList() }
+
+                private fun getItemList(): ArrayList<RecyclerListView.Item> {
+                    val itemList = ArrayList<RecyclerListView.Item>()
+                    for (file in list) {
+                        itemList.add(RecyclerListView.Item(file.name, null, false))
+                    }
+                    return itemList
+                }
+
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    Core.addView(
+                        ItemListView(
+                            context,
+                            getItemList(),
+                            Strings.VIDEO,
+                            object : RecyclerListView.OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    val file = list[index]
+                                    return if (file.exists()) {
+                                        Core.addView(VideoView(context, list[index]))
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+
+                                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                                    return false
+                                }
+                            })
+                    )
+                    return true
+                }
+
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                    return false
+                }
+            }, true),
+
+            RecyclerListView.Item(Strings.FILE, object : RecyclerListView.OnItemClickListener {
+                private fun getItemList(): ArrayList<RecyclerListView.Item>? {
+                    val sdCardPath = FileUtil.getSDCardPath() ?: return null
+                    val itemList = ArrayList<RecyclerListView.Item>()
+                    itemList.add(RecyclerListView.Item(Strings.INTERNAL_STORAGE, object : RecyclerListView.OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                            Core.addView(
+                                FileView(
+                                    context,
+                                    Environment.getRootDirectory()
+                                )
+                            )
+                            return true
+                        }
+
+                        override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                            return false
+                        }
+                    }, true))
+
+                    itemList.add(RecyclerListView.Item(Strings.SDCARD, object : RecyclerListView.OnItemClickListener {
+                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                            Core.addView(FileView(context, File(sdCardPath)))
+                            return true
+                        }
+
+                        override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                            return false
+                        }
+                    }, true))
+                    return itemList
+                }
+
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    val itemList = getItemList()
+                    if (itemList == null) {
+                        Core.addView(FileView(context, Environment.getExternalStorageDirectory()))
+                    } else {
+                        Core.addView(ItemListView(context, itemList, Strings.FILE, null))
+                    }
+                    return true
+                }
+
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                    return false
+                }
+            }, true),
+
+            RecyclerListView.Item(Strings.EXTRA_APPLICATION, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    Core.addView(AppsView(context))
+                    return true
+                }
+
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                    return false
+                }
+            }, true),
+
+            RecyclerListView.Item(Strings.SETTINGS, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    Core.addView(
+                        SettingsView(
+                            context
+                        )
+                    )
+                    return true
+                }
+
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                    return false
+                }
+
+            }, true),
+            RecyclerListView.Item(Strings.SHUFFLE_PLAY, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    MediaPresenter.shufflePlay()
+                    // 根据主题选择使用哪个播放器视图
+                    if (SPManager.getInt(SPManager.Theme.SP_NAME) == SPManager.Theme.IPOD_3RD.id) {
+                        Core.addView(MusicPlayerView3rd(context))
+                    } else {
+                        Core.addView(MusicPlayerView(context))
+                    }
+                    return true
+                }
+
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                    return false
+                }
+            }, false)
+        )
+
+        // 添加菜单项
+        for (menuItem in menuItems) {
+            listView.add(menuItem)
+        }
+
+        // 监听音乐状态变化，动态添加/移除"正在播放"项并更新封面
+        observer.addLiveData(MediaPresenter.music, object : LiveData.OnDataChangeListener {
+            override fun onStart() {
+                updateNowPlayingItem()
+                updateCoverImage()
+            }
+            override fun onDataChange() {
+                ThreadUtil.runOnUiThread {
+                    updateNowPlayingItem()
+                    updateCoverImage()
+                }
+            }
+        })
+    }
+
+    override fun enter(): Boolean {
+        return listView.onItemClick()
+    }
+
+    override fun enterLongClick(): Boolean {
+        return listView.onItemLongClick()
+    }
+
+    override fun slide(slideVal: Int): Boolean {
+        return listView.onSlide(slideVal)
+    }
+
+    override fun getLaunchMode(): Int {
+        return ScreenView.LAUNCH_MODE_SINGLE
+    }
+
+    override fun getObserver(): Observer? {
+        return observer
+    }
+
+    override fun onConfigurationChanged() {
+        android.util.Log.d("MainView", "onConfigurationChanged() called")
+
+        // 移除之前的待处理切换
+        orientationChangeHandler?.let {
+            handler?.removeCallbacks(it)
+        }
+
+        // 检查方向是否真的改变了
+        val newOrientation = if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            Configuration.ORIENTATION_LANDSCAPE
+        } else {
+            Configuration.ORIENTATION_PORTRAIT
+        }
+
+        if (newOrientation == lastKnownOrientation) {
+            android.util.Log.d("MainView", "Orientation unchanged, skipping update")
+            return
+        }
+
+        // 如果已经在处理切换，等待后重试
+        if (orientationChangeLock.get()) {
+            android.util.Log.d("MainView", "Orientation change already in progress, will retry")
+            orientationChangeHandler = Runnable {
+                updateLayoutForOrientation()
+            }
+            handler?.postDelayed(orientationChangeHandler!!, 300)
+            return
+        }
+
+        // 防抖：延迟执行以避免快速连续切换
+        orientationChangeHandler = Runnable {
+            updateLayoutForOrientation()
+        }
+        handler?.postDelayed(orientationChangeHandler!!, 200)
+    }
+
+    override fun onViewAdd() {
+        android.util.Log.d("MainView", "onViewAdd() called")
+
+        // 首次进入时测量并记录设备尺寸
+        if (!deviceDimensions.measuredPortrait && !deviceDimensions.measuredLandscape) {
+            android.util.Log.d("MainView", "First view add, measuring device dimensions...")
+            measureAndStoreDimensions()
+        }
+        if (MediaPresenter.getCurrent() == null) {
+            listView.remove(item)
+            android.util.Log.d("MainView", "No current music, removed 'Now Playing' item")
+        } else {
+            // 添加到末尾（不指定 index）
+            listView.addIfNotExist(item)
+            android.util.Log.d("MainView", "Added 'Now Playing' item at end of list")
+        }
+
+        // 强制刷新 ListView，确保新增/移除的 item 立即可见
+        // forceRefresh 使用 RecyclerView.post 确保在正确的时机刷新
+        listView.forceRefresh()
+
+        // 检查父容器尺寸是否已测量
+        val parentWidth = (parent as? android.view.ViewGroup)?.width ?: 0
+        val parentHeight = (parent as? android.view.ViewGroup)?.height ?: 0
+
+        if (parentWidth > 0 && parentHeight > 0) {
+            // 尺寸已测量，直接初始化
+            updateLayoutForOrientation()
+            updateCoverImage()
+            // startCoverAnimation() 将由 resetCoverPosition() 在完成后调用
+        } else {
+            // 延迟一帧等待测量
+            post {
+                updateLayoutForOrientation()
+                updateCoverImage()
+                // startCoverAnimation() 将由 resetCoverPosition() 在完成后调用
+            }
+        }
+
+        // 强制重新测量容器高度（修复从MusicPlayerView返回时的失真）
+        if (coverContainer.height == 0 || kotlin.math.abs(coverContainer.height - getActualContainerHeight()) > 100) {
+            android.util.Log.d("MainView", "Container height mismatch, forcing remeasure...")
+            waitForLayout {
+                val actualHeight = getActualContainerHeight()
+                android.util.Log.d("MainView", "After layout: container=${coverContainer.width}x${coverContainer.height}, estimated=$actualHeight")
+                resetCoverPosition()
+            }
+        }
+    }
+
+    /**
+     * 根据当前音乐状态更新"正在播放"项
+     * 有音乐时添加到列表末尾，无音乐时从列表移除
+     * 注意：此方法不滚动列表，只在末尾添加/移除项
+     */
+    private fun updateNowPlayingItem() {
+        if (MediaPresenter.getCurrent() == null) {
+            listView.remove(item)
+            android.util.Log.d("MainView", "Music stopped, removed 'Now Playing' item")
+        } else {
+            listView.addIfNotExist(item)
+            android.util.Log.d("MainView", "Music started, added 'Now Playing' item at end")
+        }
+    }
+
+    /**
+     * 根据当前屏幕方向更新布局参数
+     */
+    private fun updateLayoutForOrientation() {
+        // 设置锁，防止并发执行
+        if (!orientationChangeLock.compareAndSet(false, true)) {
+            android.util.Log.w("MainView", "Orientation update already in progress, skipping")
+            return
+        }
+
+        try {
+            val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val shouldMeasure = if (isLandscape) !deviceDimensions.measuredLandscape else !deviceDimensions.measuredPortrait
+
+            // 如果该方向还未测量，触发测量
+            if (shouldMeasure) {
+                android.util.Log.d("MainView", "Orientation change to ${if(isLandscape) "LANDSCAPE" else "PORTRAIT"}, measuring...")
+                measureAndStoreDimensions()
+            }
+
+            // 获取容器尺寸（优先使用记忆值）
+            val containerWidth = getActualContainerWidth()
+            val containerHeight = getActualContainerHeight()
+
+            // 计算分割线位置
+            val screenWidth = resources.displayMetrics.widthPixels
+            val dividerPosition = if (isLandscape) (screenWidth * 0.45).toInt() else (screenWidth * 0.30).toInt()
+
+            // 更新保存的值（保持兼容性）
+            savedContainerWidth = containerWidth
+            savedContainerHeight = containerHeight
+            lastKnownParentWidth = screenWidth
+            lastKnownOrientation = if (isLandscape) Configuration.ORIENTATION_LANDSCAPE else Configuration.ORIENTATION_PORTRAIT
+
+            // 更新容器布局参数
+            val containerParams = coverContainer.layoutParams as LayoutParams
+            containerParams.width = savedContainerWidth
+            coverContainer.layoutParams = containerParams
+
+            // 更新ListView宽度
+            val listParams = listView.layoutParams as LayoutParams
+            listParams.width = dividerPosition
+            listView.layoutParams = listParams
+
+            // 更新分割线位置
+            val dividerParams = dividerView.layoutParams as LayoutParams
+            dividerParams.leftMargin = dividerPosition - 2
+            dividerView.layoutParams = dividerParams
+
+            android.util.Log.d("MainView", "Layout updated: landscape=$isLandscape, container=${savedContainerWidth}x${savedContainerHeight}, divider=$dividerPosition")
+
+            // 强制重新布局
+            listView.requestLayout()
+            coverContainer.requestLayout()
+            dividerView.requestLayout()
+            requestLayout()
+
+            // 横竖屏切换后重新计算图片位置（保持动画状态连续性）
+            waitForLayout {
+                updateCoverAnimationForOrientation()
+            }
+        } finally {
+            handler?.postDelayed({
+                orientationChangeLock.set(false)
+            }, 500)
+        }
+    }
+
+    /**
+     * 等待布局完成后执行回调
+     * 使用 ViewTreeObserver.OnGlobalLayoutListener 确保布局实际完成
+     */
+    private fun waitForLayout(callback: () -> Unit) {
+        // 移除旧监听器
+        globalLayoutListener?.let {
+            coverContainer.viewTreeObserver.removeOnGlobalLayoutListener(it)
+        }
+
+        // 创建新监听器
+        globalLayoutListener = android.view.ViewTreeObserver.OnGlobalLayoutListener {
+            if (coverContainer.width > 0 && coverContainer.height > 0) {
+                coverContainer.viewTreeObserver.removeOnGlobalLayoutListener(globalLayoutListener)
+                globalLayoutListener = null
+                isLayoutPending = false
+                android.util.Log.d("MainView", "Layout completed: ${coverContainer.width}x${coverContainer.height}")
+                callback()
+            }
+        }
+
+        coverContainer.viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
+        isLayoutPending = true
+        coverContainer.requestLayout()
+    }
+
+    private fun updateCoverImage() {
+        android.util.Log.d("MainView", "updateCoverImage() called")
+        val currentMusic = MediaPresenter.getCurrent()
+        android.util.Log.d("MainView", "currentMusic: ${currentMusic?.title}")
+        if (currentMusic != null) {
+            // 使用 MediaUtil.getMusicImage 获取不带倒影的原图
+            val coverBitmap = io.github.xejohv.podclassicxzs.util.MediaUtil.getMusicImage(currentMusic)
+            android.util.Log.d("MainView", "coverBitmap: ${coverBitmap != null}, size: ${coverBitmap?.width}x${coverBitmap?.height}")
+            if (coverBitmap != null) {
+                coverImageView.setImageBitmap(coverBitmap)
+                android.util.Log.d("MainView", "Bitmap set to coverImageView, scheduling resetCoverPosition after layout")
+                // 使用 waitForLayout 替代 postDelayed，确保布局完成后再重置位置
+                waitForLayout {
+                    android.util.Log.d("MainView", "Layout completed, executing resetCoverPosition()...")
+                    resetCoverPosition()
+                }
+            } else {
+                // 随机选一个图片当封面
+                android.util.Log.d("MainView", "No cover bitmap, using random cover")
+                setRandomCover()
+            }
+        } else {
+            // 随机选一个图片当封面
+            android.util.Log.d("MainView", "No current music, using random cover")
+            setRandomCover()
+        }
+    }
+
+    /**
+     * 立即将当前图片位置限制在有效边界内，防止露出黑边
+     * 在横竖屏切换时调用，确保图片位置始终有效
+     *
+     * 使用统一的宽度获取函数，确保与其他函数一致
+     */
+    private fun clampCurrentPositionToBounds() {
+        // 使用统一的宽度获取函数，确保与其他函数一致
+        val containerWidth = getActualContainerWidth()
+
+        // 高度使用基于屏幕的估算（此函数在布局完成前调用）
+        val screenHeight = resources.displayMetrics.heightPixels
+        val containerHeight = (screenHeight * 0.9).toInt()
+
+        val imageWidth = coverImageView.width
+        val imageHeight = coverImageView.height
+
+        if (containerWidth <= 0 || containerHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+            return
+        }
+
+        // 计算有效边界（图片不能露出黑边）
+        val minX = if (imageWidth > containerWidth) (containerWidth - imageWidth).toFloat() else 0f
+        val maxX = 0f
+        val minY = if (imageHeight > containerHeight) (containerHeight - imageHeight).toFloat() else 0f
+        val maxY = 0f
+
+        // 获取当前位置
+        val currentX = coverImageView.x
+        val currentY = coverImageView.y
+
+        // 限制在边界内
+        val clampedX = kotlin.math.max(minX, kotlin.math.min(maxX, currentX))
+        val clampedY = kotlin.math.max(minY, kotlin.math.min(maxY, currentY))
+
+        // 如果位置需要调整，立即应用（取消当前动画）
+        if (clampedX != currentX || clampedY != currentY) {
+            stopCoverAnimation()
+            coverImageView.x = clampedX
+            coverImageView.y = clampedY
+            android.util.Log.d("MainView", "Position clamped: ($currentX, $currentY) -> ($clampedX, $clampedY), bounds: x[$minX,$maxX], y[$minY,$maxY]")
+        }
+    }
+
+    private fun resetCoverPosition() {
+        // 停止当前动画（防止与位置重置冲突）
+        stopCoverAnimation()
+
+        // 移除：不再在这里调用 clampCurrentPositionToBounds()
+        // 原因：1) updateLayoutForOrientation() 已经调用过了
+        //       2) 这里会重新计算正确的位置，无需额外 clamp
+
+        // 使用统一的尺寸获取函数
+        val containerWidth = getActualContainerWidth()
+        val containerHeight = getActualContainerHeight()
+
+        android.util.Log.d("MainView", "resetCoverPosition() - container: ${containerWidth}x${containerHeight}")
+
+        // 获取图片实际尺寸 - 确保 Bitmap 已就绪
+        val drawable = coverImageView.drawable
+        if (drawable == null) {
+            android.util.Log.w("MainView", "Drawable not ready, scheduling retry...")
+            // 使用 waitForLayout 替代 postDelayed
+            waitForLayout {
+                resetCoverPosition()
+            }
+            return
+        }
+
+        val bitmapWidth = drawable.intrinsicWidth
+        val bitmapHeight = drawable.intrinsicHeight
+
+        // 增加更严格的尺寸检查
+        if (containerWidth <= 0 || containerHeight <= 0) {
+            android.util.Log.w("MainView", "Container size invalid: ${containerWidth}x${containerHeight}, waiting for layout...")
+            updateLayoutForOrientation()
+            return  // waitForLayout 会调用 resetCoverPosition
+        }
+
+        if (bitmapWidth <= 0 || bitmapHeight <= 0) {
+            android.util.Log.w("MainView", "Bitmap size invalid: ${bitmapWidth}x${bitmapHeight}, reloading image...")
+            updateCoverImage()  // 重新加载图片
+            return  // updateCoverImage 会通过 waitForLayout 调用 resetCoverPosition
+        }
+        
+        // 计算缩放比例：确保图片填满整个容器（不露出黑色背景）
+        // 同时保证至少一个边超出容器，以便有移动空间展示全貌
+        val scaleX = containerWidth.toFloat() / bitmapWidth
+        val scaleY = containerHeight.toFloat() / bitmapHeight
+        
+        // 基础缩放：取较大值确保填满容器
+        val baseScale = maxOf(scaleX, scaleY)
+        
+        // 计算基础图片尺寸
+        var imageWidth = (bitmapWidth * baseScale).toInt()
+        var imageHeight = (bitmapHeight * baseScale).toInt()
+        
+        // 计算可移动范围
+        var movableWidth = imageWidth - containerWidth
+        var movableHeight = imageHeight - containerHeight
+        
+        // 确保至少有一个方向有足够的移动范围来展示图片全貌
+        // 目标是让图片至少有一个边的可移动范围 >= 容器对应边的15%
+        val targetMovableWidth = (containerWidth * 0.15f).toInt()
+        val targetMovableHeight = (containerHeight * 0.15f).toInt()
+        
+        if (movableWidth < targetMovableWidth && movableHeight < targetMovableHeight) {
+            // 两个方向都不够，需要额外放大
+            // 根据容器比例决定优先放大哪个方向
+            if (containerWidth >= containerHeight) {
+                // 横向容器：优先确保横向有足够移动范围
+                val targetWidth = containerWidth + targetMovableWidth
+                val additionalScale = targetWidth.toFloat() / imageWidth
+                imageWidth = targetWidth
+                imageHeight = (imageHeight * additionalScale).toInt()
+            } else {
+                // 纵向容器：优先确保纵向有足够移动范围
+                val targetHeight = containerHeight + targetMovableHeight
+                val additionalScale = targetHeight.toFloat() / imageHeight
+                imageHeight = targetHeight
+                imageWidth = (imageWidth * additionalScale).toInt()
+            }
+        }
+        
+        // 保存最终尺寸
+        savedImageWidth = imageWidth
+        savedImageHeight = imageHeight
+        
+        // 更新图片视图尺寸
+        coverImageView.layoutParams = FrameLayout.LayoutParams(savedImageWidth, savedImageHeight)
+        
+        // 重新计算可移动范围
+        movableWidth = savedImageWidth - containerWidth
+        movableHeight = savedImageHeight - containerHeight
+        
+        android.util.Log.d("MainView", "resetCoverPosition() - container: ${containerWidth}x${containerHeight}, bitmap: ${bitmapWidth}x${bitmapHeight}, image: ${savedImageWidth}x${savedImageHeight}, movable: ${movableWidth}x${movableHeight}")
+        
+        // 根据可移动范围决定扫描策略
+        // 决定主扫描方向：如果横向可移动范围更大，则以横向扫描为主
+        isHorizontalScan = movableWidth >= movableHeight
+        
+        // 根据可移动范围动态调整网格数量（至少3x3，最多6x6）
+        scanGridCols = kotlin.math.max(3, kotlin.math.min(6, (movableWidth / 150).toInt() + 1))
+        scanGridRows = kotlin.math.max(3, kotlin.math.min(6, (movableHeight / 150).toInt() + 1))
+        
+        // 如果某个方向无法移动，该方向网格设为1
+        if (movableWidth <= 0) scanGridCols = 1
+        if (movableHeight <= 0) scanGridRows = 1
+        
+        // 重置扫描状态
+        currentGridX = 0
+        currentGridY = 0
+        scanDirectionX = 1
+        scanDirectionY = 1
+        visitedGrids.clear()
+        
+        android.util.Log.d("MainView", "Scan grid: ${scanGridCols}x${scanGridRows}, horizontalScan: $isHorizontalScan, movable: ${movableWidth}x${movableHeight}")
+        
+        // 设置初始位置到第一个网格点
+        val initialPos = calculateGridPosition(currentGridX, currentGridY, movableWidth, movableHeight)
+        coverImageView.x = initialPos.first
+        coverImageView.y = initialPos.second
+        android.util.Log.d("MainView", "Initial position: (${coverImageView.x}, ${coverImageView.y})")
+
+        // 启动动画（确保在所有尺寸计算完成后）
+        startCoverAnimation()
+    }
+
+    /**
+     * 横竖屏切换时更新动画状态（保持动画连续性）
+     * 与 resetCoverPosition() 不同，此函数保留动画状态
+     */
+    private fun updateCoverAnimationForOrientation() {
+        // 1. 停止当前动画
+        stopCoverAnimation()
+
+        // 2. 使用统一的尺寸获取函数
+        val containerWidth = getActualContainerWidth()
+        val containerHeight = getActualContainerHeight()
+
+        android.util.Log.d("MainView", "updateCoverAnimationForOrientation() - container: ${containerWidth}x${containerHeight}")
+
+        // 3. 获取图片实际尺寸
+        val drawable = coverImageView.drawable
+        if (drawable == null) {
+            android.util.Log.w("MainView", "Drawable not ready, scheduling retry...")
+            waitForLayout {
+                updateCoverAnimationForOrientation()
+            }
+            return
+        }
+
+        val bitmapWidth = drawable.intrinsicWidth
+        val bitmapHeight = drawable.intrinsicHeight
+
+        // 4. 尺寸检查
+        if (containerWidth <= 0 || containerHeight <= 0) {
+            android.util.Log.w("MainView", "Container size invalid: ${containerWidth}x${containerHeight}, waiting for layout...")
+            updateLayoutForOrientation()
+            return
+        }
+
+        if (bitmapWidth <= 0 || bitmapHeight <= 0) {
+            android.util.Log.w("MainView", "Bitmap size invalid: ${bitmapWidth}x${bitmapHeight}, reloading image...")
+            updateCoverImage()
+            return
+        }
+
+        // 5. 计算新的缩放比例（与 resetCoverPosition 相同逻辑）
+        val scaleX = containerWidth.toFloat() / bitmapWidth
+        val scaleY = containerHeight.toFloat() / bitmapHeight
+        val baseScale = maxOf(scaleX, scaleY)
+
+        var imageWidth = (bitmapWidth * baseScale).toInt()
+        var imageHeight = (bitmapHeight * baseScale).toInt()
+
+        var movableWidth = imageWidth - containerWidth
+        var movableHeight = imageHeight - containerHeight
+
+        val targetMovableWidth = (containerWidth * 0.15f).toInt()
+        val targetMovableHeight = (containerHeight * 0.15f).toInt()
+
+        if (movableWidth < targetMovableWidth && movableHeight < targetMovableHeight) {
+            if (containerWidth >= containerHeight) {
+                val targetWidth = containerWidth + targetMovableWidth
+                val additionalScale = targetWidth.toFloat() / imageWidth
+                imageWidth = targetWidth
+                imageHeight = (imageHeight * additionalScale).toInt()
+            } else {
+                val targetHeight = containerHeight + targetMovableHeight
+                val additionalScale = targetHeight.toFloat() / imageHeight
+                imageHeight = targetHeight
+                imageWidth = (imageWidth * additionalScale).toInt()
+            }
+        }
+
+        // 6. 保存新尺寸
+        savedImageWidth = imageWidth
+        savedImageHeight = imageHeight
+
+        // 7. 更新图片视图尺寸
+        coverImageView.layoutParams = FrameLayout.LayoutParams(savedImageWidth, savedImageHeight)
+
+        // 8. 重新计算可移动范围
+        movableWidth = savedImageWidth - containerWidth
+        movableHeight = savedImageHeight - containerHeight
+
+        android.util.Log.d("MainView", "updateCoverAnimationForOrientation() - image: ${savedImageWidth}x${savedImageHeight}, movable: ${movableWidth}x${movableHeight}")
+
+        // 9. 保存旧网格尺寸（用于调整坐标）
+        val oldGridCols = scanGridCols
+        val oldGridRows = scanGridRows
+
+        // 10. 根据新的可移动范围更新网格参数
+        isHorizontalScan = movableWidth >= movableHeight
+        scanGridCols = kotlin.math.max(3, kotlin.math.min(6, (movableWidth / 150).toInt() + 1))
+        scanGridRows = kotlin.math.max(3, kotlin.math.min(6, (movableHeight / 150).toInt() + 1))
+
+        if (movableWidth <= 0) scanGridCols = 1
+        if (movableHeight <= 0) scanGridRows = 1
+
+        // 11. 调整当前网格坐标以适应新网格尺寸
+        // 保持相对位置比例：如果旧网格是6x6，新网格是3x3，则坐标除以2
+        if (oldGridCols > 0 && oldGridRows > 0) {
+            currentGridX = (currentGridX * scanGridCols) / oldGridCols
+            currentGridY = (currentGridY * scanGridRows) / oldGridRows
+        }
+
+        // 确保坐标在新范围内
+        currentGridX = currentGridX.coerceIn(0, scanGridCols - 1)
+        currentGridY = currentGridY.coerceIn(0, scanGridRows - 1)
+
+        // 12. 清理已访问网格中超出新范围的记录
+        visitedGrids.removeIf { it.first >= scanGridCols || it.second >= scanGridRows }
+
+        android.util.Log.d("MainView", "Grid updated: ${oldGridCols}x${oldGridRows} -> ${scanGridCols}x${scanGridRows}, pos: ($currentGridX, $currentGridY), visited: ${visitedGrids.size}")
+
+        // 13. 基于当前网格坐标计算新的图片位置
+        val newPos = calculateGridPosition(currentGridX, currentGridY, movableWidth, movableHeight)
+        coverImageView.x = newPos.first
+        coverImageView.y = newPos.second
+
+        android.util.Log.d("MainView", "Position restored: (${coverImageView.x}, ${coverImageView.y})")
+
+        // 14. 重启动画
+        startCoverAnimation()
+    }
+
+    /**
+     * 计算指定网格位置对应的图片坐标
+     */
+    private fun calculateGridPosition(gridX: Int, gridY: Int, movableWidth: Int, movableHeight: Int): Pair<Float, Float> {
+        // 使用统一的尺寸获取函数
+        val containerWidth = getActualContainerWidth()
+        val containerHeight = getActualContainerHeight()
+        // 使用保存的尺寸，避免在横竖屏切换时使用旧值或零值
+        val imageWidth = savedImageWidth
+        val imageHeight = savedImageHeight
+
+        // Debug: 验证尺寸来源
+        android.util.Log.d("MainView", "calculateGridPosition - saved: ${savedImageWidth}x${savedImageHeight}, actual: ${coverImageView.width}x${coverImageView.height}, container: ${containerWidth}x${containerHeight}")
+
+        // 计算实际可移动范围（确保图片不会露出黑色背景）
+        // 图片位置范围：x ∈ [containerWidth - imageWidth, 0], y ∈ [containerHeight - imageHeight, 0]
+        val actualMinX = if (imageWidth > containerWidth) (containerWidth - imageWidth).toFloat() else 0f
+        val actualMaxX = 0f
+        val actualMinY = if (imageHeight > containerHeight) (containerHeight - imageHeight).toFloat() else 0f
+        val actualMaxY = 0f
+        
+        // 计算网格步长
+        val actualMovableWidth = (actualMaxX - actualMinX).toInt()
+        val actualMovableHeight = (actualMaxY - actualMinY).toInt()
+        val stepX = if (scanGridCols > 1) actualMovableWidth.toFloat() / (scanGridCols - 1) else 0f
+        val stepY = if (scanGridRows > 1) actualMovableHeight.toFloat() / (scanGridRows - 1) else 0f
+        
+        // 计算基础位置
+        val baseX = actualMaxX - gridX * stepX
+        val baseY = actualMaxY - gridY * stepY
+        
+        // 添加随机扰动（±15%的步长，减小扰动避免越界）
+        val randomOffsetX = if (stepX > 0) (random.nextFloat() - 0.5f) * stepX * 0.3f else 0f
+        val randomOffsetY = if (stepY > 0) (random.nextFloat() - 0.5f) * stepY * 0.3f else 0f
+        
+        // 严格限制在边界内，确保不露出黑色背景
+        val finalX = kotlin.math.max(actualMinX, kotlin.math.min(actualMaxX, baseX + randomOffsetX))
+        val finalY = kotlin.math.max(actualMinY, kotlin.math.min(actualMaxY, baseY + randomOffsetY))
+        
+        return Pair(finalX, finalY)
+    }
+
+    private fun setRandomCover() {
+        // 不再从内置图库随机抽图：随机图会让播放器看着像相册，尺寸不一也让占位时大时小
+        // 无封面统一用音符占位，样子永远一致
+        coverImageView.scaleType = android.widget.ImageView.ScaleType.FIT_XY
+        coverImageView.setImageDrawable(
+            io.github.xejohv.podclassicxzs.widget.CoverPlaceholderDrawable(
+                resources.displayMetrics.density,
+                getActualContainerWidth(),
+                getActualContainerHeight()
+            )
+        )
+        waitForLayout {
+            resetCoverPosition()
+        }
+    }
+
+    private fun startCoverAnimation() {
+        if (isAnimating) return
+        isAnimating = true
+        animateToNextPosition()
+    }
+
+    private fun animateToNextPosition() {
+        // 使用统一的尺寸获取函数，确保与其他函数一致
+        val containerWidth = getActualContainerWidth()
+        val containerHeight = getActualContainerHeight()
+        val imageWidth = savedImageWidth
+        val imageHeight = savedImageHeight
+
+        if (containerWidth == 0 || containerHeight == 0 || imageWidth == 0 || imageHeight == 0) {
+            isAnimating = false
+            return
+        }
+
+        val movableWidth = imageWidth - containerWidth
+        val movableHeight = imageHeight - containerHeight
+
+        // 蛇形扫描算法：计算下一个网格点
+        val nextPos = calculateNextGridPosition(movableWidth, movableHeight)
+        val targetX = nextPos.first
+        val targetY = nextPos.second
+
+        // 计算动画持续时间（根据距离动态调整）
+        val currentX = coverImageView.x
+        val currentY = coverImageView.y
+        val distance = kotlin.math.sqrt((targetX - currentX) * (targetX - currentX) + (targetY - currentY) * (targetY - currentY))
+        val duration = kotlin.math.max(3000L, (distance * 6).toLong()) // 至少3秒，速度减半
+
+        // 创建X轴动画
+        xAnimator = ObjectAnimator.ofFloat(coverImageView, "x", currentX, targetX).apply {
+            this.duration = duration
+            interpolator = LinearInterpolator()
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (isAnimating) {
+                        animateToNextPosition()
+                    }
+                }
+            })
+            start()
+        }
+
+        // 创建Y轴动画
+        yAnimator = ObjectAnimator.ofFloat(coverImageView, "y", currentY, targetY).apply {
+            this.duration = duration
+            interpolator = LinearInterpolator()
+            start()
+        }
+    }
+
+    private fun stopCoverAnimation() {
+        isAnimating = false
+        xAnimator?.cancel()
+        yAnimator?.cancel()
+        xAnimator?.removeAllListeners()  // 清除监听器，防止递归调用
+        yAnimator?.removeAllListeners()
+        xAnimator = null
+        yAnimator = null
+    }
+    
+    /**
+     * 蛇形扫描算法：计算下一个网格位置
+     * 采用S形扫描路径，确保覆盖图片的每个部分
+     */
+    private fun calculateNextGridPosition(movableWidth: Int, movableHeight: Int): Pair<Float, Float> {
+        // 记录当前网格为已访问
+        visitedGrids.add(Pair(currentGridX, currentGridY))
+        
+        // 计算下一个网格位置（蛇形扫描）
+        if (isHorizontalScan) {
+            // 横向为主扫描：每行从左到右或从右到左，然后换行
+            currentGridX += scanDirectionX
+            
+            // 检查是否需要换行
+            if (currentGridX >= scanGridCols || currentGridX < 0) {
+                scanDirectionX = -scanDirectionX // 反转X方向
+                currentGridX = kotlin.math.max(0, kotlin.math.min(scanGridCols - 1, currentGridX))
+                currentGridY += scanDirectionY // 移动到下一行
+                
+                // 检查是否需要反转Y方向（到达底部）
+                if (currentGridY >= scanGridRows || currentGridY < 0) {
+                    scanDirectionY = -scanDirectionY
+                    currentGridY = kotlin.math.max(0, kotlin.math.min(scanGridRows - 1, currentGridY))
+                    
+                    // 如果所有网格都已访问，随机选择一个未访问的网格或重新开始
+                    if (visitedGrids.size >= scanGridCols * scanGridRows) {
+                        visitedGrids.clear()
+                        // 随机选择新起点
+                        currentGridX = random.nextInt(scanGridCols)
+                        currentGridY = random.nextInt(scanGridRows)
+                    }
+                }
+            }
+        } else {
+            // 纵向为主扫描：每列从上到下或从下到上，然后换列
+            currentGridY += scanDirectionY
+            
+            // 检查是否需要换列
+            if (currentGridY >= scanGridRows || currentGridY < 0) {
+                scanDirectionY = -scanDirectionY // 反转Y方向
+                currentGridY = kotlin.math.max(0, kotlin.math.min(scanGridRows - 1, currentGridY))
+                currentGridX += scanDirectionX // 移动到下一列
+                
+                // 检查是否需要反转X方向（到达边缘）
+                if (currentGridX >= scanGridCols || currentGridX < 0) {
+                    scanDirectionX = -scanDirectionX
+                    currentGridX = kotlin.math.max(0, kotlin.math.min(scanGridCols - 1, currentGridX))
+                    
+                    // 如果所有网格都已访问，随机选择一个新起点
+                    if (visitedGrids.size >= scanGridCols * scanGridRows) {
+                        visitedGrids.clear()
+                        currentGridX = random.nextInt(scanGridCols)
+                        currentGridY = random.nextInt(scanGridRows)
+                    }
+                }
+            }
+        }
+        
+        // 计算目标位置
+        val pos = calculateGridPosition(currentGridX, currentGridY, movableWidth, movableHeight)
+        android.util.Log.d("MainView", "Next grid: ($currentGridX, $currentGridY), pos: (${pos.first}, ${pos.second}), visited: ${visitedGrids.size}/${scanGridCols * scanGridRows}")
+        
+        return pos
+    }
+
+    private fun changeCoverImage() {
+        // 检查是否正在播放音乐
+        val currentMusic = MediaPresenter.getCurrent()
+        if (currentMusic != null) {
+            val coverBitmap = currentMusic.image
+            if (coverBitmap != null) {
+                coverImageView.setImageBitmap(coverBitmap)
+                return
+            }
+        }
+        // 没有正在播放或没有封面，随机选一张
+        setRandomCover()
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        stopCoverAnimation()
+    }
+
+    override fun onViewRemove() {
+        // 清理布局监听器
+        globalLayoutListener?.let {
+            coverContainer.viewTreeObserver.removeOnGlobalLayoutListener(it)
+            globalLayoutListener = null
+        }
+        // 清理方向变化处理器
+        orientationChangeHandler?.let {
+            handler?.removeCallbacks(it)
+            orientationChangeHandler = null
+        }
+        isLayoutPending = false
+        isAnimating = false
+        xAnimator?.cancel()
+        yAnimator?.cancel()
+    }
+}

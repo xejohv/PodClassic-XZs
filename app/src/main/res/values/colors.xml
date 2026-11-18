@@ -1,45 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#000000</color>
-    <color name="colorAccent">#FF0000</color>
-    <color name="colorPrimaryDark">#88000000</color>
+    <!-- 外壳深褐黑（与香槟金机身搭配） -->
+    <color name="colorPrimary">#C9AE68</color>
+    <color name="colorAccent">#8C8752</color>
+    <color name="colorPrimaryDark">#B3231C10</color>
 
-    <!-- iPod Classic 风格主题色 -->
-    <color name="main">#007AFF</color>
-    <color name="main_light">#5AC8FA</color>
-    <color name="main_dark">#0055B3</color>
-    
-    <!-- iPod Classic 选中渐变 -->
-    <color name="ipod_selected_top">#4A90D9</color>
-    <color name="ipod_selected_bottom">#0066CC</color>
-    <color name="ipod_selected_border">#0055AA</color>
+    <!-- 主强调色：香槟金 -->
+    <color name="main">#8C8752</color>
+    <color name="main_light">#BDB47C</color>
+    <color name="main_dark">#6B6539</color>
 
-    <!-- 背景色 - 更柔和的灰 -->
-    <color name="background_dark_1">#E8E8E8</color>
-    <color name="background_dark_2">#D0D0D0</color>
-    <color name="background">#F0F0F0</color>
-    <color name="background_light">#FFFFFF</color>
-    
-    <!-- 文字颜色 -->
+    <!-- 选中条目渐变（金色） -->
+    <color name="ipod_selected_top">#4A4022</color>
+    <color name="ipod_selected_bottom">#2A2415</color>
+    <color name="ipod_selected_border">#1C180F</color>
+
+    <!-- 屏幕/列表背景：象牙米白 -->
+    <color name="background_dark_1">#DCC98D</color>
+    <color name="background_dark_2">#C0A961</color>
+    <color name="background">#E8D69C</color>
+    <color name="background_light">#F6EAC0</color>
+
+    <!-- 文字：暖褐黑 -->
     <color name="text_light">#FFFFFF</color>
-    <color name="text">#1A1A1A</color>
-    <color name="text_secondary">#666666</color>
-    
-    <!-- 分隔线 - 更细更柔和 -->
-    <color name="line">#C0C0C0</color>
-    <color name="divider_light">#E0E0E0</color>
+    <color name="text">#2A2415</color>
+    <color name="text_secondary">#5A4C22</color>
 
-    <color name="battery_green">#4CAF50</color>
-    <color name="battery_red">#F44336</color>
-    <color name="battery_yellow">#FFC107</color>
+    <color name="line">#A08B48</color>
+    <color name="divider_light">#C4AC66</color>
+
+    <color name="battery_green">#9AA35E</color>
+    <color name="battery_red">#B7513C</color>
+    <color name="battery_yellow">#D9B248</color>
 
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
-    <color name="grey">#333333</color>
+    <color name="grey">#2B2519</color>
 
-    <color name="theme_red">#FF0000</color>
-    <color name="theme_black">#333333</color>
-    <color name="theme_white">#BBBBBB</color>
+    <!-- 转盘：香槟金盘面 + 深褐圆心 -->
+    <color name="theme_red">#000000</color>
+    <color name="theme_black">#FFFFFF</color>
+    <color name="theme_white">#D6CCA6</color>
+    <color name="theme_gold_inner">#B29B54</color>
 
 
     <color name="background_1">#87CEFF</color>

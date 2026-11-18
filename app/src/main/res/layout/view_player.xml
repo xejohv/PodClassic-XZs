@@ -55,6 +55,17 @@
                 android:gravity="center_vertical" />
         </LinearLayout>
 
+        <!-- 播放模式切换时的即时提示，1.6 秒后自动消失 -->
+        <androidx.appcompat.widget.AppCompatTextView
+            android:id="@+id/tv_mode_bubble"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|center_vertical"
+            android:textColor="@color/text"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
     </FrameLayout>
 
     <!-- 专辑封面和歌曲信息区域 - iPod Classic 风格 -->
@@ -71,12 +82,12 @@
         android:clipToPadding="false">
 
         <!-- 专辑封面 - 靠左上显示，使用带倒影的图片 -->
-        <com.example.podclassic.widget.ImageView
+        <io.github.xejohv.podclassicxzs.widget.ImageView
             android:id="@+id/image"
-            android:layout_width="160dp"
-            android:layout_height="200dp"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
             android:layout_marginStart="10dp"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="8dp"
             android:layout_marginEnd="8dp"
             android:scaleType="centerCrop" />
 
@@ -145,7 +156,7 @@
                 android:gravity="start" />
 
             <!-- 歌词 -->
-            <com.example.podclassic.widget.TextView
+            <io.github.xejohv.podclassicxzs.widget.TextView
                 android:id="@+id/tv_lyric"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -186,7 +197,7 @@
             android:padding="0dp" />
 
         <!-- 进度条 -->
-        <com.example.podclassic.widget.ScreenLayout
+        <io.github.xejohv.podclassicxzs.widget.ScreenLayout
             android:id="@+id/seek_bar"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -209,6 +220,37 @@
             android:gravity="start"
             android:padding="0dp" />
 
+    </LinearLayout>
+
+    <!-- 常驻音量条：与进度条同风格，随时可拖，直接改系统媒体音量 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="10dp">
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ic_volume_down"
+            android:layout_width="@dimen/icon_size"
+            android:layout_height="@dimen/icon_size"
+            android:src="@drawable/ic_volume_down_grey_600_18dp" />
+
+        <SeekBar
+            android:id="@+id/volume_seek"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp" />
+
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/ic_volume_up"
+            android:layout_width="@dimen/icon_size"
+            android:layout_height="@dimen/icon_size"
+            android:src="@drawable/ic_volume_up_grey_600_18dp" />
     </LinearLayout>
 
 </LinearLayout>

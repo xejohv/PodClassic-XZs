@@ -1,127 +1,110 @@
-# PodClassicMod
+# PodClassic-XZs
 
-PodClassicMod is an Android local music player styled after the iPod Classic experience.
+An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)** — a fork of the PodClassic lineage, tuned into a single-purpose retro music device.
 
-PodClassicMod 是一个模仿 iPod Classic 交互体验的 Android 本地音乐播放器。
+面向 **索尼 Xperia XZs（SO-03J 日版）** 的 iPod Classic 风格本地音乐播放器，由 PodClassic 一系改造而来，按「纯音乐播放器」整机场景重新调过。
 
-![PodClassic screenshot](./img/1.jpg)
+---
 
-## Overview / 项目简介
+## 来源与致谢 / Credits & Lineage
 
-This fork keeps the original retro interaction model and focuses on making the project easier to use and easier to release.
+> 本项目是**分支（fork）**，不是原创项目，也**不是**上游的官方发布。
 
-这个 fork 保留了原作的复古交互逻辑，并重点补强了可发布性、可维护性和实际使用体验。
+| 层级 | 项目 | 说明 |
+| --- | --- | --- |
+| 原始 | **PodClassic** | 作者 `0x1317bf7`，MIT License，最后版本 1.5（2022-06） |
+| 延续 | **PodClassicMod** | `Dora-z/PodClassicMod`，承接上游继续修改 |
+| 本分支 | **PodClassic-XZs** | `xejohv/PodClassic-XZs`，针对 Xperia XZs 整机改造 |
 
-## Downloads / 下载
+- 原始版权归 **0x1317bf7** 所有，许可证为 MIT，见 [LICENSE](./LICENSE)。
+- 上游 PodClassic 的原始仓库与账号已删除（IzzyOnDroid 标记 `NoSourceSince`），本项目是该代码线的延续分支。
+- 所有在本分支新增的改动版权归本分支维护者所有，同样以 MIT 授权。
 
-Latest release / 最新发布:
+---
 
-[v1.5.16](https://github.com/Dora-z/PodClassicMod/releases/tag/v1.5.16)
+## 和上游版本的差异 / What changed
 
-Included APKs / 当前提供的 APK:
+### 外观
+- 金色机身配色（对齐 Xperia XZs 金色款），黑色转盘 + 白色三角，满幅贴边
+- 顶部单行标题栏：时间 / 播放状态 / 电量；标题过长时播放状态下沉隐藏（B 方案）
+- 无封面时显示金色实心音符占位（不再随机抽图）
+- 任何界面（含相机、视频、蓝牙、游戏）不显示状态栏与导航栏
 
-- `PodClassic_launcher_v1.5.16_signed.apk`
-- `PodClassic_normal_v1.5.16_signed.apk`
+### 播放
+- 播放模式两处入口：右上角图标点击弹气泡 + 长按 MENU 弹「播放模式」菜单
+- 常驻音量条（不再只在拖动进度时闪现）
+- 封面、歌名、艺人、专辑、进度时间完整显示
 
-## Builds / 版本说明
+### 手势
+- **三指上滑**：任意界面回主菜单
+- **长按音量下键 1.2 秒**：回桌面（从相机等外部应用逃生）
+- 底部上滑 HOME / 左右边缘内滑 BACK / 上滑停顿 RECENTS
 
-Launcher mode:
+### 附加程序
+- 相机入口、内嵌 PodClassic 风格蓝牙页（不跳系统设置）
+- 6 个游戏：俄罗斯方块（落点描影）、贪吃蛇（五键手柄）、飞机大战（2 颗清屏炸弹）、打砖块、数独、扫雷
+- 游戏全屏：下滑折叠转盘区，画面铺满；未全屏自动暂停
 
-- Can act as a home launcher.
-- Keeps the launcher-oriented behavior enabled in this fork.
+### 稳定性
+- 修复「菜单空白 / 停止运行」：后台 HandlerThread 写自定义 LiveData 导致的 `WrongThreadException`
+- 修复相机启动崩溃
+- 修复播放时持续震动、菜单列表滑动过快
+- 锁定仅竖屏
 
-Launcher 模式:
+---
 
-- 可以注册为桌面启动器。
-- 保留本 fork 中已经完成的 launcher 相关适配。
+## 适用机型 / Device
 
-Normal mode:
+| 项 | 值 |
+| --- | --- |
+| 机型 | Sony SO-03J（Xperia XZs，docomo 日版） |
+| 系统 | Android 8.0.0（API 26），arm64-v8a |
+| 分辨率 | 1080×1920，density 480（densityDpi override 540） |
+| minSdk / targetSdk | 26 / 34 |
+| applicationId | `io.github.xejohv.podclassicxzs` |
 
-- Works like a standard local music player app.
-- Does not register as a home launcher.
+其它机型未验证；UI 的 overscan、触摸区、字号均按上述分辨率校准。
 
-普通模式:
+---
 
-- 作为常规本地音乐播放器运行。
-- 不会注册为桌面启动器。
+## 构建 / Build
 
-## Highlights / 主要改动
-
-- Rebuilt CoverFlow to better match the classic layered iTunes style.
-- Tuned cover size, centering, overlap, depth, and animation through multiple visual revisions.
-- Added stable album and artist text below the centered cover.
-- Reduced blank or white covers during fast scrolling by improving preloading behavior.
-- Fixed the initial CoverFlow position so the first album opens centered.
-- Fixed progress time labels on the now-playing page so they stay on one line.
-- Added and maintained a launcher build that can still be released separately.
-
-- 重做 CoverFlow，使其更接近经典 iTunes 的分层透视效果。
-- 多轮调整封面大小、居中、重叠、纵深和动画表现。
-- 在中间封面下方稳定显示当前专辑名和歌手名。
-- 优化快速滚动时的封面预加载，减少空白或白块封面。
-- 修复 CoverFlow 首次进入时首张专辑不能正确居中的问题。
-- 修复正在播放页面进度条两侧时间换行的问题。
-- 重新维护并保留可单独发布的 Launcher 版本。
-
-## Source Defaults / 源码默认状态
-
-The repository is kept in launcher mode by default.
-
-当前仓库源码默认保持为 launcher 模式。
-
-Default switches / 默认开关位置:
-
-- `app/src/main/java/com/example/podclassic/values/Values.kt`
-- `app/src/main/AndroidManifest.xml`
-
-In the default source state:
-
-- `Values.LAUNCHER` is `true`
-- `AndroidManifest.xml` includes the `HOME` and launcher-related `DEFAULT` categories
-
-默认源码状态下:
-
-- `Values.LAUNCHER` 为 `true`
-- `AndroidManifest.xml` 中保留 `HOME` 以及 launcher 相关的 `DEFAULT` 分类
-
-## Build / 构建
-
-Requirements / 需求:
-
-- JDK 17
-- Android SDK with Build Tools 34
-
-Build the default launcher release / 构建默认 launcher 版:
+需要 JDK 17 + Android SDK (compileSdk 34)。
 
 ```bash
+# local.properties 需提供签名口令（该文件不入库）
+pod.storePassword=***
+pod.keyAlias=podclassic
+pod.keyPassword=***
+
 ./gradlew assembleRelease
 ```
 
-Build the normal release / 构建普通版:
+`app/build.gradle` 从 `local.properties` 读取签名口令；未提供时产出的 APK 不具备发布签名。
 
-1. Set `Values.LAUNCHER = false`
-2. Remove or comment out the launcher-only intent categories in `AndroidManifest.xml`
-3. Run `./gradlew assembleRelease`
+---
 
-1. 将 `Values.LAUNCHER` 改为 `false`
-2. 删除或注释 `AndroidManifest.xml` 中仅 launcher 模式需要的 intent category
-3. 运行 `./gradlew assembleRelease`
+## 安装与整机配置 / Install
 
-## Key Files / 关键文件
+```bash
+adb install -r PodClassicXZs_v1.5.17.apk
 
-- `app/src/main/java/com/example/podclassic/view/ComposeCoverFlowView.kt`
-- `app/src/main/java/com/example/podclassic/view/CoverFlowNativeView.kt`
-- `app/src/main/java/com/example/podclassic/view/MusicPlayerView.kt`
-- `app/src/main/java/com/example/podclassic/view/MusicPlayerView3rd.kt`
-- `app/src/main/java/com/example/podclassic/values/Values.kt`
-- `app/src/main/AndroidManifest.xml`
+# 设为唯一桌面
+adb shell cmd package set-home-activity --user 0 io.github.xejohv.podclassicxzs/io.github.xejohv.podclassicxzs.activity.MainActivity
 
-## Credits / 致谢
+# 全屏沉浸，不显示状态栏/导航栏
+adb shell settings put global policy_control immersive.full=*
+adb shell wm overscan 0,0,0,-162
 
-Original project / 原始项目:
+# 手势服务
+adb shell settings put secure enabled_accessibility_services io.github.xejohv.podclassicxzs/io.github.xejohv.podclassicxzs.gestures.GestureService
+adb shell settings put secure accessibility_enabled 1
+```
 
-[0x1317bf7/PodClassic](https://github.com/0x1317bf7/PodClassic)
+---
 
-Maintained fork / 当前 fork:
+## 说明 / Notes
 
-[Dora-z/PodClassicMod](https://github.com/Dora-z/PodClassicMod)
+- 本包按单机使用场景调整（隐藏系统 UI、单一桌面、USB 默认 MTP），不作为通用播放器发布。
+- 与上游同签名体系无关：本分支重新签名，**不能覆盖安装上游包**，需先卸载旧包。
+- 演示视频与截图见 Release 附件。

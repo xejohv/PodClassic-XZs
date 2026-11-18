@@ -8,7 +8,7 @@ import android.widget.FrameLayout
 import com.example.game.core.GameView
 import com.example.game.core.Object
 import com.example.game.util.Colors
-import com.example.podclassic.base.ScreenView
+import io.github.xejohv.podclassicxzs.base.ScreenView
 import kotlin.random.Random
 
 class Brick constructor(context: Context) : FrameLayout(context), ScreenView {
