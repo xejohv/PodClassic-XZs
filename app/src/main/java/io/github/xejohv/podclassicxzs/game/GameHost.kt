@@ -44,9 +44,13 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
         const val BAR_NONE = 2
 
         private val BEST = HashMap<String, Int>()
+        @JvmStatic
         protected val COLOR_BG: Int get() = Colors.gameBg
+        @JvmStatic
         protected val COLOR_INK: Int get() = Colors.gameInk
+        @JvmStatic
         protected val COLOR_ACCENT: Int get() = Colors.gameAccent
+        @JvmStatic
         protected val COLOR_DEEP: Int get() = Colors.gameDeep
     }
 

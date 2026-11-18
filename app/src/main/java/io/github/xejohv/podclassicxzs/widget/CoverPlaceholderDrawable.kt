@@ -1,5 +1,7 @@
 package io.github.xejohv.podclassicxzs.widget
 
+import io.github.xejohv.podclassicxzs.values.Colors
+
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -23,7 +25,7 @@ class CoverPlaceholderDrawable(
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val notePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Colors.coverPlaceholderBg
+        color = Colors.selected_text
     }
     private val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -38,11 +40,14 @@ class CoverPlaceholderDrawable(
         val w = b.width().toFloat()
         val h = b.height().toFloat()
 
-        // 深褐渐变底
+        // 底色跟随机身配色：浅色主题用深一档做底，暗黑主题反过来用亮一档，避免整块糊黑
+        val dark = Colors.isDark
+        val c1 = if (dark) Colors.background_light else Colors.background_dark_2
+        val c2 = if (dark) Colors.background
+        else Color.rgb(Color.red(c1) * 55 / 100, Color.green(c1) * 55 / 100, Color.blue(c1) * 55 / 100)
         bgPaint.shader = LinearGradient(
             b.left.toFloat(), b.top.toFloat(), b.left.toFloat(), b.bottom.toFloat(),
-            Color.rgb(0x2E, 0x25, 0x14), Color.rgb(0x11, 0x0D, 0x07),
-            Shader.TileMode.CLAMP
+            c1, c2, Shader.TileMode.CLAMP
         )
         canvas.drawRect(b, bgPaint)
         bgPaint.shader = null

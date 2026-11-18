@@ -50,7 +50,7 @@ object Colors {
         main = 0xFF8C8752.toInt(),
         mainLight = 0xFFBDB47C.toInt(),
         mainDark = 0xFF6B6539.toInt(),
-        disc = 0xFF000000.toInt(),
+        disc = 0xFFC81E1E.toInt(),
         discInner = 0xFFB29B54.toInt(),
         selTop = 0xFF4A4022.toInt(),
         selBottom = 0xFF2A2415.toInt(),
@@ -59,21 +59,21 @@ object Colors {
 
     /** 暗黑 Black —— 机身 #1B1B1B */
     private val BLACK = Palette(
-        bg = 0xFF242424.toInt(),
-        bgLight = 0xFF333333.toInt(),
-        bgDark1 = 0xFF1B1B1B.toInt(),
-        bgDark2 = 0xFF141414.toInt(),
-        text = 0xFFF2F2F2.toInt(),
-        textSecondary = 0xFFB5B5B5.toInt(),
-        line = 0xFF5A5A5A.toInt(),
-        divider = 0xFF3D3D3D.toInt(),
-        main = 0xFF9E9E9E.toInt(),
-        mainLight = 0xFFC9C9C9.toInt(),
-        mainDark = 0xFF6B6B6B.toInt(),
-        disc = 0xFFF5F5F5.toInt(),
+        bg = 0xFF2C2C2C.toInt(),
+        bgLight = 0xFF3C3C3C.toInt(),
+        bgDark1 = 0xFF1C1C1C.toInt(),
+        bgDark2 = 0xFF101010.toInt(),
+        text = 0xFFF5F5F5.toInt(),
+        textSecondary = 0xFFC8C8C8.toInt(),
+        line = 0xFF8A8A8A.toInt(),
+        divider = 0xFF4E4E4E.toInt(),
+        main = 0xFFC4C4C4.toInt(),
+        mainLight = 0xFFE0E0E0.toInt(),
+        mainDark = 0xFF909090.toInt(),
+        disc = 0xFFC81E1E.toInt(),
         discInner = 0xFF2C2C2C.toInt(),
-        selTop = 0xFF4E4E4E.toInt(),
-        selBottom = 0xFF2A2A2A.toInt(),
+        selTop = 0xFF5C5C5C.toInt(),
+        selBottom = 0xFF303030.toInt(),
         selText = 0xFFFFFFFF.toInt()
     )
 
@@ -90,7 +90,7 @@ object Colors {
         main = 0xFF46697F.toInt(),
         mainLight = 0xFF7E9CAF.toInt(),
         mainDark = 0xFF33505F.toInt(),
-        disc = 0xFF22303A.toInt(),
+        disc = 0xFFC81E1E.toInt(),
         discInner = 0xFFB7CCDF.toInt(),
         selTop = 0xFF2E4A5B.toInt(),
         selBottom = 0xFF1B2F3A.toInt(),
@@ -190,6 +190,15 @@ object Colors {
 
     val controller: Int get() = p.disc
     val button: Int get() = p.discInner
+
+    /** 当前配色是否偏暗（暗黑主题需要另做对比处理） */
+    val isDark: Boolean
+        get() {
+            val c = p.bg
+            val v = (android.graphics.Color.red(c) * 299 + android.graphics.Color.green(c) * 587 +
+                    android.graphics.Color.blue(c) * 114) / 1000
+            return v < 110
+        }
 
     /** 屏幕底色 = 机身色，整块屏幕与机身同色系 */
     val screen: Int get() = p.bg

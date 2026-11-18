@@ -278,7 +278,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_TOP)
         addView(coverContainer, containerParams)
-        coverContainer.setBackgroundColor(android.graphics.Color.BLACK)
+        coverContainer.setBackgroundColor(Colors.background_dark_2)
 
         // 设置图片视图的初始布局参数，实际尺寸将在图片加载后根据比例计算
         val imageParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)

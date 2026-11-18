@@ -89,7 +89,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         Log.d("MusicPlayerView", "Init started")
         val view = LayoutInflater.from(context).inflate(R.layout.view_player, this, true)
         // 播放页底色跟随机身配色（XML 里的静态色在这里统一覆盖）
-        setBackgroundColor(Colors.screen)
+        setBackgroundColor(Colors.background_light)
+        (view as? android.view.ViewGroup)?.getChildAt(0)?.setBackgroundColor(Colors.background_light)
         album = view.findViewById(R.id.tv_album)
         artist = view.findViewById(R.id.tv_artist)
         title = view.findViewById(R.id.tv_title)
@@ -211,6 +212,11 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     /** 常驻音量条：直接读写系统媒体音量，滑动即生效，并被系统音量键同步 */
     private fun initVolumeRow(root: android.view.View) {
         volumeSeek = root.findViewById(R.id.volume_seek)
+        // 音量条跟随机身配色，避免用系统默认的金色
+        volumeSeek.progressTintList = android.content.res.ColorStateList.valueOf(Colors.main)
+        volumeSeek.thumbTintList = android.content.res.ColorStateList.valueOf(Colors.main_dark)
+        volumeSeek.progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Colors.line)
+        volumeSeek.splitTrack = false
         volumeSeek.max = VolumeUtil.maxVolume
         volumeSeek.progress = VolumeUtil.getCurrentVolume()
         volumeSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
