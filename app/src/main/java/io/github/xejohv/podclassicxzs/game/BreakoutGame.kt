@@ -15,7 +15,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
     companion object {
         private const val COLS = 7
         private const val ROWS = 6
-        private const val PADDLE_Y = 0.88f   // 挡板中心线（归一化纵向坐标）
+        private const val PADDLE_Y = 0.91f   // 挡板中心线（归一化纵向坐标）
         private const val BALL_R = 0.012f    // 球半径（归一化）
     }
 
