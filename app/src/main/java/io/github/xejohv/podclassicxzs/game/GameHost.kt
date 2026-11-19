@@ -454,7 +454,7 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
 
     /** 内容区域（扣掉顶部 HUD 与底部操作条） */
     protected fun contentRect(): Rect {
-        val top = dp(50f).toInt()
+        val top = dp(42f).toInt()
         val bottom = when {
             hasBar() -> (barTop() - dp(12f)).toInt()
             // 控制盘展开时底部留出提示条，游戏画面不再被提示压住
