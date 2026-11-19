@@ -21,6 +21,7 @@ import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
 import io.github.xejohv.podclassicxzs.util.ThreadUtil
 import io.github.xejohv.podclassicxzs.values.Values
 import io.github.xejohv.podclassicxzs.view.MusicPlayerView
+import io.github.xejohv.podclassicxzs.view.PowerMenuView
 
 class MainActivity : AppCompatActivity() {
 
@@ -36,6 +37,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
+        // 长按电源键 → 无障碍服务把系统的电源菜单换成了 PodClassic 自己的
+        if (intent?.getBooleanExtra("pod_power_menu", false) == true) {
+            ThreadUtil.runOnUiThread {
+                Core.addView(PowerMenuView(this))
+            }
+            return
+        }
         val uri = intent?.data
         if (uri != null) {
             val music = MediaStoreUtil.getMusicFromUri(uri)

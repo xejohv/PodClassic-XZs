@@ -19,6 +19,16 @@ import android.os.Vibrator;
 import android.view.KeyEvent;
 
 import java.lang.reflect.Method;
+import java.util.List;
+
+import android.content.Intent;
+import android.accessibilityservice.GestureDescription;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
+
+import io.github.xejohv.podclassicxzs.activity.MainActivity;
 
 /**
  * PodClassic 内置手势/状态栏管控层（原 PodGesturesAPK 已合并进来）。
@@ -31,6 +41,38 @@ import java.lang.reflect.Method;
  * 状态栏：任何界面都不允许状态栏/通知栏停留，一旦展开立即收起。
  */
 public class GestureService extends AccessibilityService {
+
+    /** 服务单例，供 App 内部调用（例如电源菜单要代点系统按钮） */
+    private static GestureService instance;
+
+    public static GestureService getInstance() {
+        return instance;
+    }
+
+    /** 退出 PodClassic 自己的电源菜单时，把还留在下面的系统菜单也关掉 */
+    public static void closeSystemPowerMenu() {
+        GestureService s = instance;
+        if (s == null) {
+            return;
+        }
+        try {
+            if (s.hasPowerMenu()) {
+                s.performGlobalAction(GLOBAL_ACTION_BACK);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "closeSystemPowerMenu failed", e);
+        }
+    }
+
+    private boolean hasPowerMenu() {
+        return findLabelNode("关机") != null;
+    }
+
+    /** 让无障碍去点被盖住的系统电源菜单里的按钮：关机 / 重新启动 */
+    public static boolean clickPowerLabel(String label) {
+        GestureService s = instance;
+        return s != null && s.clickLabel(label);
+    }
 
     private static final String TAG = "PodGestureService";
 
@@ -59,6 +101,7 @@ public class GestureService extends AccessibilityService {
     public void onServiceConnected() {
         super.onServiceConnected();
         Log.i(TAG, "service connected");
+        instance = this;
         wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         initStatusBar();
@@ -86,6 +129,8 @@ public class GestureService extends AccessibilityService {
         if (pkg != null && "com.android.systemui".equals(pkg.toString())) {
             // 状态栏/通知栏一出现就立即收起
             collapseShade();
+            // 长按电源键弹出的系统电源菜单，一出现就换成 PodClassic 自己的
+            maybeReplacePowerMenu(event);
         }
     }
 
@@ -136,6 +181,7 @@ public class GestureService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        instance = null;
         handler.removeCallbacksAndMessages(null);
         remove();
         super.onDestroy();
@@ -319,4 +365,126 @@ public class GestureService extends AccessibilityService {
             }
         }
     }
+
+    /** 系统电源菜单的窗口类名（Sony Android 8 上是 GlobalActionsDialog 之类） */
+    private long lastPowerMenuAt = 0L;
+
+    private void maybeReplacePowerMenu(AccessibilityEvent event) {
+        if (event.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            return;
+        }
+        CharSequence cls = event.getClassName();
+        if (cls == null) {
+            return;
+        }
+        if (!cls.toString().contains("GlobalActions")) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastPowerMenuAt < 900L) {
+            return;
+        }
+        lastPowerMenuAt = now;
+        openPodPowerMenu();
+    }
+
+    private void openPodPowerMenu() {
+        try {
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            intent.putExtra("pod_power_menu", true);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.w(TAG, "open pod power menu failed", e);
+        }
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        instance = null;
+        return super.onUnbind(intent);
+    }
+
+    private AccessibilityNodeInfo findLabelNode(String label) {
+        try {
+            List<AccessibilityWindowInfo> windows = getWindows();
+            if (windows == null || windows.isEmpty()) {
+                return null;
+            }
+            for (AccessibilityWindowInfo w : windows) {
+                AccessibilityNodeInfo root = w.getRoot();
+                if (root == null) {
+                    continue;
+                }
+                List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(label);
+                if (nodes == null || nodes.isEmpty()) {
+                    continue;
+                }
+                for (AccessibilityNodeInfo n : nodes) {
+                    Rect r = new Rect();
+                    n.getBoundsInScreen(r);
+                    if (r.width() > 0 && r.height() > 0) {
+                        return n;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "findLabelNode failed: " + label, e);
+        }
+        return null;
+    }
+
+    private boolean clickLabel(String label) {
+        try {
+            List<AccessibilityWindowInfo> windows = getWindows();
+            if (windows == null || windows.isEmpty()) {
+                return false;
+            }
+            for (AccessibilityWindowInfo w : windows) {
+                AccessibilityNodeInfo root = w.getRoot();
+                if (root == null) {
+                    continue;
+                }
+                List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(label);
+                if (nodes == null) {
+                    continue;
+                }
+                for (AccessibilityNodeInfo n : nodes) {
+                    AccessibilityNodeInfo target = n;
+                    int guard = 0;
+                    while (target != null && !target.isClickable() && guard < 4) {
+                        target = target.getParent();
+                        guard++;
+                    }
+                    if (target != null && target.isClickable()
+                            && target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        return true;
+                    }
+                    Rect r = new Rect();
+                    n.getBoundsInScreen(r);
+                    if (r.width() > 0 && r.height() > 0) {
+                        return tapAt(r.centerX(), r.centerY());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "clickLabel failed: " + label, e);
+        }
+        return false;
+    }
+
+    private boolean tapAt(int x, int y) {
+        try {
+            Path path = new Path();
+            path.moveTo(x, y);
+            GestureDescription.StrokeDescription stroke =
+                    new GestureDescription.StrokeDescription(path, 0, 60);
+            GestureDescription gesture = new GestureDescription.Builder().addStroke(stroke).build();
+            return dispatchGesture(gesture, null, null);
+        } catch (Exception e) {
+            Log.w(TAG, "tapAt failed", e);
+            return false;
+        }
+    }
+
 }

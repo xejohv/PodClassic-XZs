@@ -1,5 +1,8 @@
 package io.github.xejohv.podclassicxzs.base
 
+import io.github.xejohv.podclassicxzs.gestures.GestureService
+import io.github.xejohv.podclassicxzs.view.PowerMenuView
+
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.Configuration
@@ -210,7 +213,12 @@ object Core {
 
     fun removeView(): Boolean {
         gameExpanded = false
+        val leavingPowerMenu = screen.get() is PowerMenuView
         val result = screen.remove()
+        if (leavingPowerMenu) {
+            // 退出自己的电源菜单时，把被盖在下面的系统电源菜单一并关掉
+            GestureService.closeSystemPowerMenu()
+        }
         activity?.initView()
         return result
     }

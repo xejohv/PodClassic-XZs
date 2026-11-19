@@ -49,6 +49,19 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!-- 只用于"锁屏"的设备管理员 -->
+        <receiver
+            android:name="io.github.xejohv.podclassicxzs.service.PodDeviceAdminReceiver"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
         <!-- 媒体播放服务 -->
         <service
             android:name="io.github.xejohv.podclassicxzs.service.MediaService"
