@@ -45,7 +45,8 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
 
     private fun padRect(): Rect {
         val content = contentRect()
-        val h = dp(74f).toInt()
+        // 两排数字（1-5 / 6-9 + ✕），每排留足呼吸空间
+        val h = dp(112f).toInt()
         val side = dp(12f).toInt()
         return Rect(content.left + side, content.bottom - h, content.right - side, content.bottom)
     }
@@ -192,8 +193,10 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
         if (digitsVisible()) {
             val pad = padRect()
             if (pad.contains(x.toInt(), y.toInt())) {
-                val slot = pad.width() / 10f
-                val idx = ((x - pad.left) / slot).toInt().coerceIn(0, 9)
+                val slot = pad.width() / 5f
+                val row = ((y - pad.top) / (pad.height() / 2f)).toInt().coerceIn(0, 1)
+                val col = ((x - pad.left) / slot).toInt().coerceIn(0, 4)
+                val idx = row * 5 + col
                 value[sel] = if (idx == 9) 0 else idx + 1
                 checkWin()
                 return true
@@ -232,7 +235,7 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
     private fun boardRect(): Rect {
         val content = contentRect()
         val top0 = content.top + dp(56f)
-        val padH = if (digitsVisible()) dp(74f) + dp(10f) else 0f
+        val padH = if (digitsVisible()) dp(112f) + dp(10f) else 0f
         val availH = (content.bottom - dp(14f) - padH) - top0
         val size = min(content.width().toFloat() - dp(16f), availH).toInt()
         val left = content.left + (content.width() - size) / 2
@@ -310,21 +313,29 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
         // 数字行：只在选中可填空格时浮出，1-9 + ✕
         if (digitsVisible()) {
             val pad = padRect()
-            val slot = pad.width() / 10f
-            val cy = pad.centerY().toFloat()
+            val slot = pad.width() / 5f
+            val rowH = pad.height() / 2f
+            val cur = value[sel]
             for (i in 0 until 10) {
-                val left = pad.left + i * slot
-                val cur = value[sel]
+                val r0 = i / 5
+                val c0 = i % 5
+                val left = pad.left + c0 * slot
+                val top = pad.top + r0 * rowH
                 val isCur = (i < 9 && cur == i + 1) || (i == 9 && cur == 0)
-                fillPaint.color = if (isCur) Color.argb(230, 46, 37, 20) else Color.argb(70, 46, 37, 20)
+                fillPaint.color = if (isCur) Color.argb(235, 46, 37, 20) else Color.argb(64, 46, 37, 20)
                 canvas.drawRoundRect(
-                    RectF(left + dp(3f), pad.top + dp(6f), left + slot - dp(3f), pad.bottom - dp(6f)),
-                    dp(6f), dp(6f), fillPaint
+                    RectF(left + dp(7f), top + dp(9f), left + slot - dp(7f), top + rowH - dp(9f)),
+                    dp(11f), dp(11f), fillPaint
                 )
                 numPaint.textAlign = Paint.Align.CENTER
-                numPaint.textSize = dp(24f)
+                numPaint.textSize = dp(22f)
                 numPaint.color = if (isCur) 0xFFE8D69C.toInt() else 0xFF1F1A0E.toInt()
-                canvas.drawText(if (i == 9) "✕" else (i + 1).toString(), left + slot / 2f, cy + dp(8f), numPaint)
+                canvas.drawText(
+                    if (i == 9) "✕" else (i + 1).toString(),
+                    left + slot / 2f,
+                    top + rowH / 2f + dp(7.5f),
+                    numPaint
+                )
             }
             numPaint.textAlign = Paint.Align.LEFT
         }

@@ -20,7 +20,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
     private val bricks = IntArray(COLS * ROWS)
     private var paddleX = 0.5f
     private var ballX = 0.5f
-    private var ballY = 0.9f
+    private var ballY = 0.84f
     private var vx = 0.22f
     private var vy = -0.34f
     private var launched = false
@@ -31,15 +31,22 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
 
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val bar = listOf(
-        BarBtn("◀") { if (expanded && started && !gameOver) onSlide(-1) },
-        BarBtn("●") { if (expanded && started && !gameOver) onPrimary() },
-        BarBtn("▶") { if (expanded && started && !gameOver) onSlide(1) }
-    )
+    // 打砖块不需要底部操作条：左右滑动移动挡板，轻点画面发球
+    override fun barButtons(): List<BarBtn> = emptyList()
 
-    override fun barButtons(): List<BarBtn> = bar
+    override fun startHint(): String = "左右滑动移动挡板 · 轻点发球"
 
-    override fun startHint(): String = "点击 ● 发球"
+    // 轻点画面 = 发球（未发球时），发球后轻点不再干扰
+    override fun onTapContent(x: Float, y: Float): Boolean {
+        if (!expanded || gameOver) {
+            return false
+        }
+        if (!launched) {
+            launched = true
+            return true
+        }
+        return false
+    }
 
     override fun resetGame() {
         score = 0
@@ -63,7 +70,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
     private fun resetBall() {
         launched = false
         ballX = paddleX
-        ballY = 0.90f
+        ballY = 0.84f
         vx = if ((level + score) % 2 == 0) 0.20f else -0.20f
         vy = -0.32f - level * 0.02f
     }
@@ -76,7 +83,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
         }
         if (!launched) {
             ballX = paddleX
-            ballY = 0.90f
+            ballY = 0.84f
             return
         }
 
@@ -195,7 +202,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
         // 挡板
         val pw = w * 0.22f
         val px = ox + paddleX * w
-        val py = oy + h * 0.94f
+        val py = oy + h * 0.88f
         fillPaint.color = 0xFF1F1A0E.toInt()
         canvas.drawRoundRect(px - pw / 2, py - dp(7f), px + pw / 2, py + dp(7f), dp(7f), dp(7f), fillPaint)
         fillPaint.color = 0xFFE8D69C.toInt();
