@@ -93,19 +93,39 @@ class CameraView(context: Context) : FrameLayout(context), ScreenView {
         }
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        // 沉浸/展回控制盘时页面高度会变，预览的裁剪矩阵要跟着重算
+        applyTransform()
+    }
+
     // ---------------- ScreenView ----------------
 
     override fun getTitle(): String = "相机"
 
     override fun getLaunchMode(): Int = ScreenView.LAUNCH_MODE_SINGLE
 
+    private val immerseAgain = Runnable {
+        if (ui.isAttachedToWindow) Core.setGameExpanded(true)
+    }
+
     override fun onViewAdd() {
         if (preview.isAvailable) openCamera()
         loadLastThumb()
         ui.invalidate()
+        // 相机页进入即沉浸：收起控制盘、隐藏标题栏，取景铺满整屏
+        Core.setGameExpanded(true)
+        // 刚加入的 View 还没测量完，折叠可能被时序冲掉，补一帧
+        ui.postDelayed(immerseAgain, 260)
     }
 
     override fun onViewRemove() {
+        ui.removeCallbacks(immerseAgain)
+        releaseCamera()
+    }
+
+    override fun onViewDelete() {
+        ui.removeCallbacks(immerseAgain)
         releaseCamera()
     }
 
@@ -442,6 +462,7 @@ class CameraView(context: Context) : FrameLayout(context), ScreenView {
             drawShutter(canvas, w, h)
             drawSwap(canvas, w, h)
             drawThumb(canvas, h)
+            drawGestureHint(canvas, w)
             drawToast(canvas, w, h)
         }
 
@@ -552,6 +573,15 @@ class CameraView(context: Context) : FrameLayout(context), ScreenView {
             }
         }
 
+        /** 右上角下方一行小字：告诉用户怎么收起控制盘 / 怎么退出 */
+        private fun drawGestureHint(canvas: Canvas, w: Float) {
+            p.style = Paint.Style.FILL
+            p.color = Color.argb(150, 255, 255, 255)
+            p.textAlign = Paint.Align.CENTER
+            p.textSize = dp(12f)
+            canvas.drawText("上滑展回控制盘 · 左上长按回主菜单", w / 2f, dp(84f), p)
+        }
+
         private fun drawToast(canvas: Canvas, w: Float, h: Float) {
             val t = toastText ?: return
             p.style = Paint.Style.FILL
@@ -567,49 +597,93 @@ class CameraView(context: Context) : FrameLayout(context), ScreenView {
             canvas.drawText(t, w / 2f, h - dp(124f), p)
         }
 
+        private var downX = 0f
+        private var downY = 0f
+        private var downTime = 0L
+        private var longPressed = false
+        private val longPressRunnable = Runnable {
+            longPressed = true
+            Core.home()
+        }
+
         override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
-            if (event.action != android.view.MotionEvent.ACTION_DOWN) {
-                return event.action == android.view.MotionEvent.ACTION_UP
+            when (event.action) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    downTime = System.currentTimeMillis()
+                    longPressed = false
+                    // 报错态：先试着重来一次（例如用户刚在系统里授予了相机权限）
+                    if (errorText != null) {
+                        errorText = null
+                        invalidate()
+                        openCamera()
+                        return true
+                    }
+                    // 左上长按 0.6 秒 = 直接回主菜单
+                    if (event.x < dp(80f) && event.y < dp(80f)) {
+                        postDelayed(longPressRunnable, 600)
+                    }
+                    return true
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    if (!longPressed && abs(event.y - downY) > dp(28f)) {
+                        removeCallbacks(longPressRunnable)
+                    }
+                    return true
+                }
+                android.view.MotionEvent.ACTION_UP -> {
+                    removeCallbacks(longPressRunnable)
+                    if (longPressed) {
+                        longPressed = false
+                        return true
+                    }
+                    val dx = event.x - downX
+                    val dy = event.y - downY
+                    val dt = System.currentTimeMillis() - downTime
+                    // 纵向滑动：上滑展回控制盘（退出沉浸），下滑收回（全屏）—— 与游戏手势一致
+                    if (dt > 120 && abs(dy) > dp(70f) && abs(dy) > abs(dx) * 1.4f) {
+                        if (dy < 0) {
+                            Core.setGameExpanded(false)
+                        } else {
+                            Core.setGameExpanded(true)
+                        }
+                        return true
+                    }
+                    handleTap(event.x, event.y)
+                    return true
+                }
+                else -> return true
             }
-            val x = event.x
-            val y = event.y
+        }
+
+        private fun handleTap(x: Float, y: Float) {
             val w = width.toFloat()
             val h = height.toFloat()
-
-            // 报错态：先试着重来一次（例如用户刚在系统里授予了相机权限）
-            if (errorText != null) {
-                errorText = null
-                ui.invalidate()
-                openCamera()
-                return true
-            }
-
             // 左上返回
             if (x < dp(80f) && y < dp(80f)) {
                 Core.removeView()
-                return true
+                return
             }
             // 右上闪光
             if (x > w - dp(80f) && y < dp(80f)) {
                 cycleFlash()
-                return true
+                return
             }
             // 快门
             if (abs(x - w / 2f) < dp(38f) && abs(y - (h - dp(54f))) < dp(38f)) {
                 takePhoto()
-                return true
+                return
             }
             // 右下切换镜头
             if (abs(x - (w - dp(46f))) < dp(30f) && abs(y - (h - dp(54f))) < dp(30f)) {
                 switchCamera()
-                return true
+                return
             }
             // 左下看最近一张
             if (abs(x - dp(46f)) < dp(30f) && abs(y - (h - dp(54f))) < dp(30f)) {
                 openLastPhoto()
-                return true
             }
-            return true
         }
     }
 }
