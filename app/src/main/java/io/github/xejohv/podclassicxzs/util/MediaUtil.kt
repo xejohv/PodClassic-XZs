@@ -60,12 +60,14 @@ object MediaUtil {
 
 
     fun getMusicImage(music: Music): Bitmap? {
-        val bitmap = if (music.albumId != null && music.albumId != 0L) {
+        var bitmap = if (music.albumId != null && music.albumId != 0L) {
             getAlbumImage(music.albumId)
-        } else if (music.data != null) {
-            getMusicImage(music.data)
         } else {
             null
+        }
+        // 系统 albumart 库里没有该专辑时（album_info 与 audio 的 id 对不上），退回文件内嵌封面
+        if (bitmap == null && music.data != null) {
+            bitmap = getMusicImage(music.data)
         }
         if (bitmap != null) {
             // 保持原始宽高比，只限制最大边长（原来强制 400x400 会把非方形封面压扁）

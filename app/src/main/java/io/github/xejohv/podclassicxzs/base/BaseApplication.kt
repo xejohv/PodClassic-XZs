@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
 import android.os.Environment
+import io.github.xejohv.podclassicxzs.util.MediaScanUtil
 import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
@@ -19,6 +20,7 @@ class BaseApplication : Application() {
         super.onCreate()
         context = this
         Core.init()
+        MediaScanUtil.scanMissingAsync(this)
 
         /*
         Thread.setDefaultUncaughtExceptionHandler { _, e ->

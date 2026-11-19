@@ -126,9 +126,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                     
                     if (Math.abs(deltaY) > SLIDE_PX) {
                         if (deltaY < 0) {
-                            onSlide(-1)
-                        } else {
                             onSlide(1)
+                        } else {
+                            onSlide(-1)
                         }
                         touchStartY = event.y
                     }
@@ -361,9 +361,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
                 if (Math.abs(deltaY) > SLIDE_PX) {
                     if (deltaY < 0) {
-                        onSlide(-1)
-                    } else {
                         onSlide(1)
+                    } else {
+                        onSlide(-1)
                     }
                     touchStartY = event.y
                 }

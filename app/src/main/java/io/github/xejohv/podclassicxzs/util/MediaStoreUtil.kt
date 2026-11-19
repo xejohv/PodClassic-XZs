@@ -221,42 +221,52 @@ object MediaStoreUtil {
     }
 
     fun getAlbumList(): ArrayList<MusicList> {
-        val cursor = BaseApplication.context.contentResolver.query(
-            MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI,
-            arrayOf(
-                // 该机 album_info 表没有 album_id 列，用 _id（本身就是专辑 ID）代替
-                MediaStore.Audio.Albums._ID,
-                MediaStore.Audio.Albums.ALBUM,
-                MediaStore.Audio.Albums.ARTIST,
-            ),
-            null,
-            null,
-            null//"${MediaStore.Audio.Albums.ALBUM} collate localized"
-        ) ?: return ArrayList()
-
-
-
-
-
-        val list = getAlbumFromCursor(cursor)
-        cursor.close()
+        // 该机 album_info 表的 _id 与 audio 表的 album_id 并不一致，
+        // 直接查 Albums 表会丢专辑（新拷入的音乐尤其明显），这里从音乐缓存聚合。
+        val albums = LinkedHashMap<String, Music>()
+        for (music in getMusicList()) {
+            val album = music.album?.trim()
+            if (album.isNullOrBlank()) continue
+            if (!albums.containsKey(album)) {
+                albums[album] = music
+            }
+        }
+        val list = ArrayList<MusicList>(albums.size)
+        for ((album, music) in albums) {
+            list.add(MusicList.Builder().apply {
+                title = album
+                data = album
+                subtitle = music.artist
+                id = music.albumId ?: 0L
+                type = MusicList.TYPE_ALBUM
+            }.build())
+        }
         list.sort()
+        Log.d("MediaStoreUtil", "album list size=${list.size} from ${albums.size} keys")
         return list
     }
 
     fun getArtistList(): ArrayList<MusicList> {
-        val cursor = BaseApplication.context.contentResolver.query(
-            MediaStore.Audio.Artists.EXTERNAL_CONTENT_URI,
-            arrayOf(
-                MediaStore.Audio.Artists.ARTIST,
-            ),
-            null,
-            null,
-            null//"${MediaStore.Audio.Artists.ARTIST} collate localized"
-        ) ?: return ArrayList()
-        val list = getArtistFromCursor(cursor)
-        cursor.close()
+        val artists = LinkedHashMap<String, Music>()
+        for (music in getMusicList()) {
+            val artist = music.artist?.trim()
+            if (artist.isNullOrBlank()) continue
+            if (!artists.containsKey(artist)) {
+                artists[artist] = music
+            }
+        }
+        val list = ArrayList<MusicList>(artists.size)
+        for ((artist, music) in artists) {
+            list.add(MusicList.Builder().apply {
+                title = artist
+                data = artist
+                subtitle = artist
+                id = music.albumId ?: 0L
+                type = MusicList.TYPE_ARTIST
+            }.build())
+        }
         list.sort()
+        Log.d("MediaStoreUtil", "artist list size=${list.size}")
         return list
     }
 
@@ -306,33 +316,27 @@ object MediaStoreUtil {
     }
 
     fun getArtistAlbum(artist: String): ArrayList<MusicList> {
-        val cursor = BaseApplication.context.contentResolver.query(
-            MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI,
-            arrayOf(MediaStore.Audio.Albums.ALBUM, MediaStore.Audio.Albums._ID),
-            "${MediaStore.Audio.Albums.ARTIST} like ? ",
-            arrayOf("%$artist%"),
-            null//MediaStore.Audio.Albums.ALBUM //+ " collate localized"
-        ) ?: return ArrayList()
-        val titleId = cursor.getColumnIndex(MediaStore.Audio.Albums.ALBUM)
-        val albumId = cursor.getColumnIndex(MediaStore.Audio.Albums._ID)
-
-        val list = ArrayList<MusicList>()
-        while (cursor.moveToNext()) {
-            val title = cursor.getString(titleId)
-            if (TextUtils.isEmpty(title)) {
-                continue
+        val albums = LinkedHashMap<String, Music>()
+        for (music in getMusicList()) {
+            val a = music.artist
+            if (a.isNullOrBlank() || !a.contains(artist)) continue
+            val album = music.album?.trim()
+            if (album.isNullOrBlank()) continue
+            if (!albums.containsKey(album)) {
+                albums[album] = music
             }
-            val album = MusicList.Builder().apply {
-                type = MusicList.TYPE_ALBUM
-                this.title = title
-                this.id = cursor.getLong(albumId)
-            }.build()
-            list.add(album)
         }
-        cursor.close()
+        val list = ArrayList<MusicList>(albums.size)
+        for ((album, music) in albums) {
+            list.add(MusicList.Builder().apply {
+                type = MusicList.TYPE_ALBUM
+                title = album
+                data = album
+                subtitle = music.artist
+                id = music.albumId ?: 0L
+            }.build())
+        }
         list.sort()
-        //val temp = ArrayList<MusicList>(list)
-        //temp.sortWith { o1, o2 -> collator.compare(o1?.name, o2?.name) }
         return list
     }
 
@@ -433,6 +437,11 @@ object MediaStoreUtil {
         }
         Log.d("MediaStoreUtil", "Returning ${musicCache?.size ?: 0} music files from cache")
         return musicCache!!
+    }
+
+    fun invalidateCache() {
+        musicCache = null
+        cacheTime = 0L
     }
 
     fun init() {
