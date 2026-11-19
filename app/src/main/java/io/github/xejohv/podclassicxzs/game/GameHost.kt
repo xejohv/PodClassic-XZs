@@ -455,7 +455,12 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
     /** 内容区域（扣掉顶部 HUD 与底部操作条） */
     protected fun contentRect(): Rect {
         val top = dp(50f).toInt()
-        val bottom = if (hasBar()) (barTop() - dp(12f)).toInt() else height
+        val bottom = when {
+            hasBar() -> (barTop() - dp(12f)).toInt()
+            // 控制盘展开时底部留出提示条，游戏画面不再被提示压住
+            !expanded -> height - dp(40f).toInt()
+            else -> height
+        }
         return Rect(0, top, width, max(top + 1, bottom))
     }
 
@@ -554,27 +559,31 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
             drawBar(canvas, w)
         }
 
-        val cy = content.centerY().toFloat()
         if (!expanded) {
+            // 控制盘展开时：画面留给游戏预览，提示收进底部一条，虚线把它与画面分开
+            val contentBottom = height.toFloat()
+            val tipTop = content.bottom.toFloat()
             if (!everStarted) {
-                // 第一次进入：保留整屏提示（这是唯一允许压住画面的一次）
-                dimOverlay(canvas, content, 200)
+                // 轻蒙版：预览保持看得清，不再把整块压成灰
+                dimOverlay(canvas, content, 70)
+                hudDivider(canvas, tipTop)
+                fillPaint.color = Color.argb(150, 232, 214, 156)
+                canvas.drawRect(0f, tipTop, width.toFloat(), contentBottom, fillPaint)
                 textPaint.color = COLOR_DEEP
-                drawCenteredFit(canvas, "下滑 全屏并开始游戏", cy - dp(2f), 20f, textPaint)
+                drawCenteredFit(canvas, "下滑 全屏并开始游戏", tipTop + dp(26f), 17f, textPaint)
             } else {
-                // 中途暂停：画面 100% 保持原样，只在左上角贴角标 + 底部一行细提示
+                // 中途暂停：画面 100% 保持原样，左上角角标 + 底部一条细提示
                 drawPauseBadge(canvas)
-                val bottom = content.bottom.toFloat()
-                val barH = dp(34f)
-                val topY = (bottom - barH).coerceAtLeast(content.top + dp(2f))
-                fillPaint.color = Color.argb(140, 232, 214, 156)
-                canvas.drawRect(0f, topY, width.toFloat(), bottom, fillPaint)
+                hudDivider(canvas, tipTop)
+                fillPaint.color = Color.argb(150, 232, 214, 156)
+                canvas.drawRect(0f, tipTop, width.toFloat(), contentBottom, fillPaint)
                 textPaint.color = COLOR_DEEP
-                drawCenteredFit(canvas, "上滑 恢复控制盘 · 已暂停", topY + dp(23f), 14f, textPaint)
+                drawCenteredFit(canvas, "上滑 恢复控制盘 · 已暂停", tipTop + dp(26f), 14f, textPaint)
             }
         } else if (!started) {
-            // 全屏但还没开局：只在操作条上方压一条窄提示，仅一行字
+            // 全屏但还没开局：操作条上方一条窄提示，虚线分隔
             val bottom = barTop()
+            hudDivider(canvas, bottom - dp(38f))
             fillPaint.color = Color.argb(120, 232, 214, 156)
             canvas.drawRect(0f, bottom - dp(38f), width.toFloat(), bottom, fillPaint)
             textPaint.color = COLOR_DEEP
@@ -605,6 +614,19 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
     }
 
     private fun contentTopBadge(): Float = dp(58f)
+
+    /** 画面与提示条之间的虚线分隔，和打炮 HUD 的处理保持一致 */
+    private fun hudDivider(canvas: Canvas, y: Float) {
+        fillPaint.color = Color.argb(96, 46, 37, 20)
+        val dashW = dp(12f)
+        val gap = dp(8f)
+        val rightEdge = width - dp(14f)
+        var x = dp(14f)
+        while (x < rightEdge) {
+            canvas.drawRect(x, y, minOf(x + dashW, rightEdge), y + dp(1.4f), fillPaint)
+            x += dashW + gap
+        }
+    }
 
     private fun dimOverlay(canvas: Canvas, content: Rect, alpha: Int) {
         fillPaint.color = Color.argb(alpha, 232, 214, 156)
