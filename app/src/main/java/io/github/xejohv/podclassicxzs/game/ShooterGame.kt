@@ -291,6 +291,10 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         val h = content.height().toFloat()
         val ox = content.left.toFloat()
         val oy = content.top.toFloat()
+        // 底部 HUD 单独占一条，游戏内容只映射到它以上的游戏区，避免飞机与炸弹/生命重叠
+        val hudTop = content.bottom - dp(92f)
+        // 展开态：内容只映射到 HUD 以上的游戏区；全屏态沿用整块高度，保持原来的手感
+        val mapH = if (expanded) h else (hudTop - oy).coerceAtLeast(dp(120f))
 
         // 背景星点（缓慢下移，给画面一点纵深）
         fillPaint.color = 0x33FFFFFF
@@ -298,7 +302,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         for (i in 0 until stars) {
             val sx = ((i * 37) % 100) / 100f
             val sy = (((i * 61) % 100) / 100f + (elapsed / 1000f) * 0.06f) % 1f
-            canvas.drawCircle(ox + sx * w, oy + sy * h, dp(1.2f), fillPaint)
+            canvas.drawCircle(ox + sx * w, oy + sy * mapH, dp(1.2f), fillPaint)
         }
 
         // 受击闪白
@@ -309,13 +313,13 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
 
         // 敌机
         for (e in enemies) {
-            drawEnemy(canvas, ox + e.x * w, oy + e.y * h, e.r * w, e.r > 0.05f)
+            drawEnemy(canvas, ox + e.x * w, oy + e.y * mapH, e.r * w, e.r > 0.05f)
         }
 
         // 敌弹（暗色弹体 + 亮边，和白色曳光弹区分开）
         for (b in eBullets) {
             val cx = ox + b.x * w
-            val cy = oy + b.y * h
+            val cy = oy + b.y * mapH
             fillPaint.color = 0xFF3A2E16.toInt()
             canvas.drawRoundRect(cx - w * 0.011f, cy - dp(7f), cx + w * 0.011f, cy + dp(7f), dp(4f), dp(4f), fillPaint)
             fillPaint.color = 0xFFFF6A4A.toInt()
@@ -325,7 +329,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         // 我方子弹：外层光晕 + 白色曳光
         for (b in bullets) {
             val cx = ox + b.x * w
-            val cy = oy + b.y * h
+            val cy = oy + b.y * mapH
             glowPaint.color = 0x66FFE9A8.toInt()
             canvas.drawRoundRect(cx - w * 0.014f, cy - dp(15f), cx + w * 0.014f, cy + dp(9f), dp(6f), dp(6f), glowPaint)
             fillPaint.color = 0xFFFFFDF2.toInt()
@@ -337,18 +341,19 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
             val alpha = (p.life / 500f).coerceIn(0f, 1f)
             glowPaint.color = 0xFFF2B33C.toInt()
             glowPaint.alpha = (255 * alpha).toInt()
-            canvas.drawCircle(ox + p.x * w, oy + p.y * h, p.size * w, glowPaint)
+            canvas.drawCircle(ox + p.x * w, oy + p.y * mapH, p.size * w, glowPaint)
         }
 
-        // 底部状态区（HUD）：虚线把画面与它分开
-        val hudTop = content.bottom - dp(92f)
-        fillPaint.color = 0x552E2514
-        val dashW = dp(14f)
-        val dashGap = dp(9f)
-        var dx = content.left + dp(16f)
-        while (dx < content.right - dp(16f)) {
-            canvas.drawRect(dx, hudTop, minOf(dx + dashW, content.right - dp(16f).toFloat()), hudTop + dp(1.6f), fillPaint)
-            dx += dashW + dashGap
+        // 底部状态区（HUD）：全屏时用虚线把画面与数据区分开；展开态底部另有提示条，不重复画线
+        if (expanded) {
+            fillPaint.color = 0x552E2514
+            val dashW = dp(14f)
+            val dashGap = dp(9f)
+            var dx = content.left + dp(16f)
+            while (dx < content.right - dp(16f)) {
+                canvas.drawRect(dx, hudTop, minOf(dx + dashW, content.right - dp(16f).toFloat()), hudTop + dp(1.6f), fillPaint)
+                dx += dashW + dashGap
+            }
         }
 
         // 左下角：炸弹按钮（图标小一号，拇指原位可达）
@@ -378,7 +383,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         // 我方战机（闪烁表示无敌时间）
         val blink = invincible > 0f && ((invincible.toInt() / 120) % 2 == 0)
         if (!blink) {
-            drawPlayer(canvas, ox + playerX * w, oy + h * 0.74f, w * 0.085f)
+            drawPlayer(canvas, ox + playerX * w, oy + mapH * (if (expanded) 0.74f else 0.80f), w * 0.085f)
         }
     }
 

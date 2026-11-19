@@ -200,17 +200,17 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
 
         // 砖块
         val brickW = w / COLS
-        val brickH = h * 0.045f
-        val top = oy + h * 0.04f
+        val brickH = h * 0.05f
+        val top = oy + h * 0.05f
         for (r in 0 until ROWS) {
             for (c in 0 until COLS) {
                 if (bricks[r * COLS + c] == 0) {
                     continue
                 }
-                val left = ox + c * brickW + dp(2f)
-                val right = ox + (c + 1) * brickW - dp(2f)
-                val bt = top + r * brickH + dp(2f)
-                val bb = top + (r + 1) * brickH - dp(2f)
+                val left = ox + c * brickW + dp(3f)
+                val right = ox + (c + 1) * brickW - dp(3f)
+                val bt = top + r * brickH + dp(3f)
+                val bb = top + (r + 1) * brickH - dp(3f)
                 fillPaint.color = if (r % 2 == 0) 0xFF2E2514.toInt() else 0xFF4A3A16.toInt()
                 canvas.drawRoundRect(left, bt, right, bb, dp(4f), dp(4f), fillPaint)
                 fillPaint.color = 0xFFE8D69C.toInt()

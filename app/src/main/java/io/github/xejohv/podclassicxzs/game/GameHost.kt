@@ -456,9 +456,9 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
     protected fun contentRect(): Rect {
         val top = dp(42f).toInt()
         val bottom = when {
+            // 控制盘展开时不绘制操作条，底边只留给提示条，画面占满其余空间
+            !expanded -> (height - dp(40f)).toInt()
             hasBar() -> (barTop() - dp(12f)).toInt()
-            // 控制盘展开时底部留出提示条，游戏画面不再被提示压住
-            !expanded -> height - dp(40f).toInt()
             else -> height
         }
         return Rect(0, top, width, max(top + 1, bottom))
