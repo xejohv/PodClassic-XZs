@@ -256,8 +256,12 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
                     longPressRunnable?.let { handler.removeCallbacks(it) }
                 }
                 if (expanded && !gameOver) {
+                    // 优先让游戏自己接管拖动（例如打砖块挡板 1:1 跟随手指）
+                    if (onDragContent(event.x, event.y)) {
+                        return true
+                    }
                     val dx = event.x - dragBaseX
-                    if (abs(dx) > dp(34f)) {
+                    if (abs(dx) > dp(24f)) {
                         onSlide(if (dx > 0) 1 else -1)
                         dragBaseX = event.x
                     }
@@ -361,6 +365,9 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
     protected abstract fun onSecondary(): Boolean
 
     protected abstract fun onSlide(slideVal: Int): Boolean
+
+    /** 画面上（非操作条）横向拖动的钩子：返回 true 表示已接管（如挡板直接跟随手指） */
+    protected open fun onDragContent(x: Float, y: Float): Boolean = false
 
     /** 画面上（非操作条）轻触的钩子，返回 true 表示已消费 */
     protected open fun onTapContent(x: Float, y: Float): Boolean = false

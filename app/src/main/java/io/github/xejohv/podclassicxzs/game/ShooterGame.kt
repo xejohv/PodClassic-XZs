@@ -40,13 +40,15 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
     private val path = Path()
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private val bar = listOf(
-        BarBtn("◀") { if (expanded && started && !gameOver) onSlide(-1) },
-        BarBtn("", { if (expanded && started && !gameOver) onPrimary() }, 1),
-        BarBtn("▶") { if (expanded && started && !gameOver) onSlide(1) }
-    )
+    /** 不放底部操作条：画面吃满到底，炸弹按钮画在左下角（拇指原位可达） */
+    override fun barButtons(): List<BarBtn> = emptyList()
 
-    override fun barButtons(): List<BarBtn> = bar
+    override fun barStyle(): Int = BAR_NONE
+
+    /** 左下角炸弹按钮的圆心与半径（绘制与命中共用） */
+    private fun bombCX(content: Rect): Float = content.left + dp(56f)
+    private fun bombCY(content: Rect): Float = content.bottom - dp(46f)
+    private fun bombR(): Float = dp(26f)
 
     override fun resetGame() {
         playerX = 0.5f
@@ -97,12 +99,12 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
     override fun update(dt: Float) {
         val sec = dt / 1000f
         elapsed += dt
-        extraLine = "生命 $lives   炸弹 $bombs"
+        extraLine = ""
 
         fireTimer += dt
         if (fireTimer >= 380f) {
             fireTimer = 0f
-            bullets.add(Bullet(playerX, 0.87f))
+            bullets.add(Bullet(playerX, 0.75f))
         }
 
         spawnTimer += dt
@@ -181,7 +183,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
 
         // 敌机撞我方
         if (invincible <= 0f) {
-            val rammed = enemies.firstOrNull { abs(it.x - playerX) < it.r + 0.05f && it.y > 0.82f }
+            val rammed = enemies.firstOrNull { abs(it.x - playerX) < it.r + 0.05f && it.y > 0.70f }
             if (rammed != null) {
                 enemies.remove(rammed)
                 boom(rammed.x, rammed.y, 12)
@@ -197,7 +199,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
 
         // 敌弹打到我方
         if (invincible <= 0f) {
-            val hit = eBullets.firstOrNull { abs(it.x - playerX) < 0.05f && it.y > 0.86f }
+            val hit = eBullets.firstOrNull { abs(it.x - playerX) < 0.05f && it.y > 0.74f }
             if (hit != null) {
                 eBullets.remove(hit)
                 boom(hit.x, hit.y, 8)
@@ -227,8 +229,19 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         particles.removeAll { it.life <= 0f }
     }
 
+    /** 手指横向拖动：飞机直接跟到手指对应的 x */
+    override fun onDragContent(x: Float, y: Float): Boolean {
+        val c = contentRect()
+        if (c.width() <= 0) {
+            return false
+        }
+        playerX = ((x - c.left) / c.width().toFloat()).coerceIn(0.08f, 0.92f)
+        return true
+    }
+
     override fun onSlide(slideVal: Int): Boolean {
-        playerX += if (slideVal > 0) 0.075f else -0.075f
+        // 碟片左右键仍可作为备用微调
+        playerX += if (slideVal > 0) 0.09f else -0.09f
         playerX = playerX.coerceIn(0.08f, 0.92f)
         return true
     }
@@ -254,7 +267,22 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         return onPrimary()
     }
 
-    override fun startHint(): String = "◀ ▶ 移动 · 中键 清屏炸弹（整局 2 颗）"
+    /** 画面内左下角炸弹按钮的点击 */
+    override fun onTapContent(x: Float, y: Float): Boolean {
+        if (!expanded || !started || gameOver) {
+            return false
+        }
+        val c = contentRect()
+        val cx = bombCX(c)
+        val cy = bombCY(c)
+        val rr = bombR() + dp(10f)
+        if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= rr * rr) {
+            return onPrimary()
+        }
+        return false
+    }
+
+    override fun startHint(): String = "拖动飞机移动 · 点左下 ✹ 引爆（整局 2 颗）"
 
     // ---------------- 绘制 ----------------
 
@@ -312,10 +340,45 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
             canvas.drawCircle(ox + p.x * w, oy + p.y * h, p.size * w, glowPaint)
         }
 
+        // 底部状态区（HUD）：虚线把画面与它分开
+        val hudTop = content.bottom - dp(92f)
+        fillPaint.color = 0x552E2514
+        val dashW = dp(14f)
+        val dashGap = dp(9f)
+        var dx = content.left + dp(16f)
+        while (dx < content.right - dp(16f)) {
+            canvas.drawRect(dx, hudTop, minOf(dx + dashW, content.right - dp(16f).toFloat()), hudTop + dp(1.6f), fillPaint)
+            dx += dashW + dashGap
+        }
+
+        // 左下角：炸弹按钮（图标小一号，拇指原位可达）
+        val bcx = bombCX(content)
+        val bcy = bombCY(content)
+        val br = bombR()
+        fillPaint.color = 0xFF2E2514.toInt()
+        canvas.drawCircle(bcx, bcy, br, fillPaint)
+        glowPaint.color = 0xFFE8D69C.toInt()
+        glowPaint.style = Paint.Style.STROKE
+        glowPaint.strokeWidth = dp(2f)
+        canvas.drawCircle(bcx, bcy, br, glowPaint)
+        glowPaint.style = Paint.Style.FILL
+
+        textPaint.color = 0xFFFFFDF2.toInt()
+        textPaint.textAlign = Paint.Align.CENTER
+        textPaint.textSize = dp(19f)
+        canvas.drawText("✹", bcx, bcy + dp(6.5f), textPaint)
+
+        // 右侧一行数据：炸弹颗数 + 生命
+        textPaint.textAlign = Paint.Align.LEFT
+        textPaint.textSize = dp(15f)
+        textPaint.color = 0xFF1F1A0E.toInt()
+        val tx = bcx + br + dp(14f)
+        canvas.drawText("✹ $bombs    生命 $lives", tx, bcy + dp(5f), textPaint)
+
         // 我方战机（闪烁表示无敌时间）
         val blink = invincible > 0f && ((invincible.toInt() / 120) % 2 == 0)
         if (!blink) {
-            drawPlayer(canvas, ox + playerX * w, oy + h * 0.93f, w * 0.085f)
+            drawPlayer(canvas, ox + playerX * w, oy + h * 0.74f, w * 0.085f)
         }
     }
 

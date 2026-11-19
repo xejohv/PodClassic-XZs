@@ -228,7 +228,7 @@ class MinesweeperGame(context: Context) : GameHost(context, "扫雷") {
         val availH = (content.bottom - dp(14f)) - top0
         val size = min(content.width().toFloat() - dp(16f), availH).toInt()
         val left = content.left + (content.width() - size) / 2
-        val top = (top0 + (availH - size) / 2f).toInt()
+        val top = (top0 + (availH - size) * 0.10f).toInt()   // 棋盘上移，减少顶部空白
         return Rect(left, top, left + size, top + size)
     }
 

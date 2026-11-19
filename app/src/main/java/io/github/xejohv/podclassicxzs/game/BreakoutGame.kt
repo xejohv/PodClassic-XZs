@@ -15,12 +15,14 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
     companion object {
         private const val COLS = 7
         private const val ROWS = 6
+        private const val PADDLE_Y = 0.88f   // 挡板中心线（归一化纵向坐标）
+        private const val BALL_R = 0.012f    // 球半径（归一化）
     }
 
     private val bricks = IntArray(COLS * ROWS)
     private var paddleX = 0.5f
     private var ballX = 0.5f
-    private var ballY = 0.84f
+    private var ballY = PADDLE_Y - BALL_R
     private var vx = 0.22f
     private var vy = -0.34f
     private var launched = false
@@ -30,6 +32,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
     private var hitFlash = 0f
 
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
 
     // 打砖块不需要底部操作条：左右滑动移动挡板，轻点画面发球
     override fun barButtons(): List<BarBtn> = emptyList()
@@ -70,7 +73,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
     private fun resetBall() {
         launched = false
         ballX = paddleX
-        ballY = 0.84f
+        ballY = PADDLE_Y - BALL_R
         vx = if ((level + score) % 2 == 0) 0.20f else -0.20f
         vy = -0.32f - level * 0.02f
     }
@@ -83,7 +86,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
         }
         if (!launched) {
             ballX = paddleX
-            ballY = 0.84f
+            ballY = PADDLE_Y - BALL_R
             return
         }
 
@@ -103,9 +106,11 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
             vy = -vy
         }
 
-        // 挡板反弹
-        if (ballY > 0.86f && ballY < 0.95f && vy > 0f && abs(ballX - paddleX) < 0.11f) {
-            ballY = 0.86f
+        // 挡板反弹：只在球心接近挡板上表面时判定，反弹后球紧贴挡板
+        if (ballY > PADDLE_Y - 0.035f && ballY < PADDLE_Y + 0.010f && vy > 0f &&
+            abs(ballX - paddleX) < 0.11f
+        ) {
+            ballY = PADDLE_Y - BALL_R
             vy = -abs(vy)
             vx = (ballX - paddleX) * 5.4f
             if (abs(vx) < 0.10f) {
@@ -146,6 +151,20 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
                 }
             }
         }
+    }
+
+    /** 手指横向拖动：挡板直接贴在手指对应的 x，1:1 跟手 */
+    override fun onDragContent(x: Float, y: Float): Boolean {
+        val c = contentRect()
+        if (c.width() <= 0) {
+            return false
+        }
+        paddleX = ((x - c.left) / c.width().toFloat()).coerceIn(0.11f, 0.89f)
+        if (!launched) {
+            ballX = paddleX
+        }
+        hitFlash = maxOf(0f, hitFlash)
+        return true
     }
 
     override fun onSlide(slideVal: Int): Boolean {
@@ -202,7 +221,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
         // 挡板
         val pw = w * 0.22f
         val px = ox + paddleX * w
-        val py = oy + h * 0.88f
+        val py = oy + h * PADDLE_Y
         fillPaint.color = 0xFF1F1A0E.toInt()
         canvas.drawRoundRect(px - pw / 2, py - dp(7f), px + pw / 2, py + dp(7f), dp(7f), dp(7f), fillPaint)
         fillPaint.color = 0xFFE8D69C.toInt();
