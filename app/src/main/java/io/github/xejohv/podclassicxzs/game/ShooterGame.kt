@@ -47,8 +47,8 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
 
     /** 左下角炸弹按钮的圆心与半径（绘制与命中共用） */
     private fun bombCX(content: Rect): Float = content.left + dp(56f)
-    private fun bombCY(content: Rect): Float = content.bottom - dp(46f)
-    private fun bombR(): Float = dp(26f)
+    private fun bombCY(content: Rect): Float = content.bottom - dp(32f)
+    private fun bombR(): Float = dp(20f)
 
     override fun resetGame() {
         playerX = 0.5f
@@ -282,7 +282,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         return false
     }
 
-    override fun startHint(): String = "拖动飞机移动 · 点左下 ✹ 引爆（整局 2 颗）"
+    override fun startHint(): String = ""
 
     // ---------------- 绘制 ----------------
 
@@ -292,7 +292,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         val ox = content.left.toFloat()
         val oy = content.top.toFloat()
         // 底部 HUD 单独占一条，游戏内容只映射到它以上的游戏区，避免飞机与炸弹/生命重叠
-        val hudTop = content.bottom - dp(92f)
+        val hudTop = content.bottom - dp(60f)
         // 展开态：内容只映射到 HUD 以上的游戏区；全屏态沿用整块高度，保持原来的手感
         val mapH = if (expanded) h else (hudTop - oy).coerceAtLeast(dp(120f))
 

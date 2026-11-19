@@ -580,7 +580,7 @@ abstract class GameHost(context: Context, private val titleText: String) : Frame
                 textPaint.color = COLOR_DEEP
                 drawCenteredFit(canvas, "上滑 恢复控制盘 · 已暂停", tipTop + dp(26f), 14f, textPaint)
             }
-        } else if (!started) {
+        } else if (!started && startHint().isNotEmpty()) {
             // 全屏但还没开局：操作条上方一条窄提示，虚线分隔
             val bottom = barTop()
             hudDivider(canvas, bottom - dp(38f))
