@@ -98,6 +98,14 @@ class AppsView(context: Context) : ItemListView(
         }
     }, true)
 
+    // 相机：内嵌在 PodClassic 里（Camera1 自绘界面），出口由自己掌握，不跳系统相机
+    private val cameraItem = Item("相机", object : OnItemClickListener {
+        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+            Core.addView(CameraView(context))
+            return true
+        }
+    }, true)
+
     // 蓝牙设置入口（单实例，重复进页也不会重复添加）
     private val btItem = Item("蓝牙", object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
@@ -119,6 +127,7 @@ class AppsView(context: Context) : ItemListView(
         // 整页重建，保证顺序稳定、不会因为反复进出而堆叠重复行
         val rows = arrayListOf<Item>()
         rows.add(gameItem)
+        rows.add(cameraItem)
 
         // 「所有程序」这一级去掉，程序直接摆在二级菜单里
         if (Values.LAUNCHER) {
@@ -138,7 +147,7 @@ class AppsView(context: Context) : ItemListView(
         itemList = rows
     }
 
-    // 收藏里挑出来的常用程序 + 内置保留的「相机」，绝不把系统应用一股脑倒出来
+    // 收藏里挑出来的常用程序（相机已改为内嵌页面，不再列系统相机）
     private fun appList(): ArrayList<App> {
         val result = arrayListOf<App>()
         val seen = HashSet<String>()
@@ -150,30 +159,7 @@ class AppsView(context: Context) : ItemListView(
                 result.add(app)
             }
         }
-        for (pair in BUILTIN) {
-            val packageName = pair.second
-            if (seen.contains(packageName)) {
-                continue
-            }
-            try {
-                context.packageManager.getApplicationInfo(packageName, 0)
-                val app = App(pair.first, packageName)
-                if (app.intent != null) {
-                    result.add(app)
-                    seen.add(packageName)
-                }
-            } catch (e: Exception) {
-                // 未安装则跳过
-            }
-        }
         return result
-    }
-
-    companion object {
-        // 只保留相机：文件走系统文件管理器，风格不统一而且退不出来，一级菜单里的「文件」已经够用
-        private val BUILTIN = listOf(
-            "相机" to "com.sonyericsson.android.camera"
-        )
     }
 
     override fun getTitle(): String {

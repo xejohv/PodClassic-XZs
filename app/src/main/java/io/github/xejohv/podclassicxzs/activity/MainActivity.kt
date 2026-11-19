@@ -368,13 +368,15 @@ class MainActivity : AppCompatActivity() {
         val permissions = if (isAndroid13OrHigher) {
             // Android 13 及以上版本
             arrayOf(
-                READ_MEDIA_AUDIO
+                READ_MEDIA_AUDIO,
+                Manifest.permission.CAMERA
             )
         } else {
             // Android 12 及以下版本
             arrayOf(
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.READ_EXTERNAL_STORAGE
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.CAMERA
             )
         }
         
