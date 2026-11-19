@@ -42,11 +42,27 @@ import io.github.xejohv.podclassicxzs.activity.MainActivity;
  */
 public class GestureService extends AccessibilityService {
 
+    /** 本应用包名：遍历窗口找系统按钮时必须跳过自己的窗口，否则会点回自己造成死循环 */
+    private static final String SELF_PKG = "io.github.xejohv.podclassicxzs";
+
     /** 服务单例，供 App 内部调用（例如电源菜单要代点系统按钮） */
     private static GestureService instance;
 
     public static GestureService getInstance() {
         return instance;
+    }
+
+    /** 回 PodClassic 桌面（激活设备管理员后从系统设置页脱身用） */
+    public static void goHome() {
+        GestureService s = instance;
+        if (s == null) {
+            return;
+        }
+        try {
+            s.performGlobalAction(GLOBAL_ACTION_HOME);
+        } catch (Exception e) {
+            Log.w(TAG, "goHome failed", e);
+        }
     }
 
     /** 退出 PodClassic 自己的电源菜单时，把还留在下面的系统菜单也关掉 */
@@ -413,7 +429,7 @@ public class GestureService extends AccessibilityService {
             }
             for (AccessibilityWindowInfo w : windows) {
                 AccessibilityNodeInfo root = w.getRoot();
-                if (root == null) {
+                if (root == null || isSelfWindow(root)) {
                     continue;
                 }
                 List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(label);
@@ -442,7 +458,7 @@ public class GestureService extends AccessibilityService {
             }
             for (AccessibilityWindowInfo w : windows) {
                 AccessibilityNodeInfo root = w.getRoot();
-                if (root == null) {
+                if (root == null || isSelfWindow(root)) {
                     continue;
                 }
                 List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(label);
@@ -471,6 +487,12 @@ public class GestureService extends AccessibilityService {
             Log.w(TAG, "clickLabel failed: " + label, e);
         }
         return false;
+    }
+
+    /** 这个窗口是不是 PodClassic 自己的（自己的菜单里也有"关机"字样，必须排除） */
+    private boolean isSelfWindow(AccessibilityNodeInfo root) {
+        CharSequence pkg = root.getPackageName();
+        return pkg != null && SELF_PKG.equals(pkg.toString());
     }
 
     private boolean tapAt(int x, int y) {
