@@ -70,10 +70,19 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
         resetBall()
     }
 
+
+    /** 待发/接球后球心位置：贴在挡板上沿，球体不侵入挡板 */
+    private fun restBallY(): Float {
+        val c = contentRect()
+        val hh = c.height().toFloat()
+        if (hh <= 0f) return PADDLE_Y - BALL_R
+        return PADDLE_Y - dp(15f) / hh
+    }
+
     private fun resetBall() {
         launched = false
         ballX = paddleX
-        ballY = PADDLE_Y - BALL_R
+        ballY = restBallY()
         vx = if ((level + score) % 2 == 0) 0.20f else -0.20f
         vy = -0.32f - level * 0.02f
     }
@@ -86,7 +95,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
         }
         if (!launched) {
             ballX = paddleX
-            ballY = PADDLE_Y - BALL_R
+            ballY = restBallY()
             return
         }
 
@@ -110,7 +119,7 @@ class BreakoutGame(context: Context) : GameHost(context, "打砖块") {
         if (ballY > PADDLE_Y - 0.035f && ballY < PADDLE_Y + 0.010f && vy > 0f &&
             abs(ballX - paddleX) < 0.11f
         ) {
-            ballY = PADDLE_Y - BALL_R
+            ballY = restBallY()
             vy = -abs(vy)
             vx = (ballX - paddleX) * 5.4f
             if (abs(vx) < 0.10f) {
