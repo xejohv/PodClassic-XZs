@@ -302,14 +302,11 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
         }
     }
 
-    private val volumeBroadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            volumeBar.setCurrent(VolumeUtil.getCurrentVolume())
-        }
+    /** 硬件音量键 / 系统音量变化 → 同步转盘换出来的那条音量条（ContentObserver + 轮询兜底） */
+    private val volumeWatcher by lazy {
+        VolumeUtil.Watcher { v -> volumeBar.setCurrent(v) }
     }
-
-    private var broadcastReceiverRegistered = false
-    private val intentFilter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+    private var volumeWatcherStarted = false
 
     override fun onViewAdd() {
         Log.d("MusicPlayerView3rd", "========== onViewAdd() started (instance #$instanceId) ==========")
@@ -342,10 +339,9 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
         Log.d("MusicPlayerView3rd", "currentTime y=${currentTime.y}, top=${currentTime.top}")
         Log.d("MusicPlayerView3rd", "remainingTime y=${remainingTime.y}, top=${remainingTime.top}")
         
-        if (!broadcastReceiverRegistered) {
-            context.registerReceiver(volumeBroadcastReceiver, intentFilter)
-            broadcastReceiverRegistered = true
-            Log.d("MusicPlayerView3rd", "Broadcast receiver registered")
+        if (!volumeWatcherStarted) {
+            volumeWatcher.start()
+            volumeWatcherStarted = true
         }
         
         // 延迟执行布局检查
@@ -374,9 +370,9 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
     }
 
     override fun onViewRemove() {
-        if (broadcastReceiverRegistered) {
-            context.unregisterReceiver(volumeBroadcastReceiver)
-            broadcastReceiverRegistered = false
+        if (volumeWatcherStarted) {
+            volumeWatcher.stop()
+            volumeWatcherStarted = false
         }
     }
 
@@ -425,8 +421,13 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
                 volumeBar.setCurrent(curVolume)
                 return true
             } else {
-                volumeBar.setCurrent(VolumeUtil.getCurrentVolume())
+                // 第一次转动：把进度条换成音量条，同时这一步就生效，不用再转一下才有反应
+                volumeBar.textVisibility = View.GONE
                 setSeekBar(volumeBar)
+                val maxVolume = VolumeUtil.maxVolume
+                val curVolume = (VolumeUtil.getCurrentVolume() + slideVal).coerceIn(0, maxVolume)
+                VolumeUtil.setCurrentVolume(curVolume)
+                volumeBar.setCurrent(curVolume)
                 return true
             }
         }

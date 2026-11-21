@@ -60,7 +60,6 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
     private val progressBar: SeekBar = SeekBar(context)
     private val volumeBar: SeekBar = SeekBar(context)
-    private lateinit var volumeSeek: android.widget.SeekBar
     private var bubble: android.widget.TextView? = null
 
     private val screenLayout: ScreenLayout
@@ -206,30 +205,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         //onPlayStateChange()
         //onMusicChange()
         setVolumeBar()
-        initVolumeRow(view)
     }
 
-    /** 常驻音量条：直接读写系统媒体音量，滑动即生效，并被系统音量键同步 */
-    private fun initVolumeRow(root: android.view.View) {
-        volumeSeek = root.findViewById(R.id.volume_seek)
-        // 音量条跟随机身配色，避免用系统默认的金色
-        volumeSeek.progressTintList = android.content.res.ColorStateList.valueOf(Colors.main)
-        volumeSeek.thumbTintList = android.content.res.ColorStateList.valueOf(Colors.main_dark)
-        volumeSeek.progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Colors.line)
-        volumeSeek.splitTrack = false
-        volumeSeek.max = VolumeUtil.maxVolume
-        volumeSeek.progress = VolumeUtil.getCurrentVolume()
-        volumeSeek.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: android.widget.SeekBar?, p: Int, fromUser: Boolean) {
-                if (fromUser) {
-                    VolumeUtil.setCurrentVolume(p)
-                }
-            }
 
-            override fun onStartTrackingTouch(sb: android.widget.SeekBar?) {}
-            override fun onStopTrackingTouch(sb: android.widget.SeekBar?) {}
-        })
-    }
     private fun sgn(x: Float): Float {
         return when {
             x < 0f -> -1f
@@ -335,18 +313,14 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         }
     }
 
-    private val volumeBroadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val v = VolumeUtil.getCurrentVolume()
-            volumeBar.setCurrent(v)
-            if (this@MusicPlayerView::volumeSeek.isInitialized) {
-                volumeSeek.progress = v
-            }
-        }
+    /**
+     * 硬件音量键 / 系统音量变化 → 同步那条"转盘换出来的音量条"。
+     * 用 VolumeUtil.Watcher（ContentObserver + 轮询兜底），不再依赖不可靠的 VOLUME_CHANGED 广播。
+     */
+    private val volumeWatcher by lazy {
+        VolumeUtil.Watcher { v -> volumeBar.setCurrent(v) }
     }
-
-    private var broadcastReceiverRegistered = false
-    private val intentFilter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+    private var volumeWatcherStarted = false
 
     override fun onViewAdd() {
         Log.d("MusicPlayerView", "========== onViewAdd() started ==========")
@@ -354,10 +328,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         Log.d("MusicPlayerView", "MusicPlayerView measuredWidth=$measuredWidth, measuredHeight=$measuredHeight")
         Log.d("MusicPlayerView", "Parent=${parent?.javaClass?.simpleName}, Parent size=${(parent as? ViewGroup)?.width}x${(parent as? ViewGroup)?.height}")
         
-        if (!broadcastReceiverRegistered) {
-            context.registerReceiver(volumeBroadcastReceiver, intentFilter)
-            broadcastReceiverRegistered = true
-            Log.d("MusicPlayerView", "Broadcast receiver registered")
+        if (!volumeWatcherStarted) {
+            volumeWatcher.start()
+            volumeWatcherStarted = true
         }
         
         // 获取根视图并记录其状态
@@ -415,9 +388,9 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     }
 
     override fun onViewRemove() {
-        if (broadcastReceiverRegistered) {
-            context.unregisterReceiver(volumeBroadcastReceiver)
-            broadcastReceiverRegistered = false
+        if (volumeWatcherStarted) {
+            volumeWatcher.stop()
+            volumeWatcherStarted = false
         }
     }
 
@@ -466,10 +439,13 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 volumeBar.setCurrent(curVolume)
                 return true
             } else {
-                volumeBar.setCurrent(VolumeUtil.getCurrentVolume())
-                // 切换到音量条时，确保不显示时间，只显示音量图标
+                // 第一次转动：把进度条换成音量条，同时这一步就生效，不用再转一下才有反应
                 volumeBar.textVisibility = View.GONE
                 setSeekBar(volumeBar)
+                val maxVolume = VolumeUtil.maxVolume
+                val curVolume = (VolumeUtil.getCurrentVolume() + slideVal).coerceIn(0, maxVolume)
+                VolumeUtil.setCurrentVolume(curVolume)
+                volumeBar.setCurrent(curVolume)
                 return true
             }
         }

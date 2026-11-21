@@ -221,35 +221,5 @@
 
     </LinearLayout>
 
-    <!-- 常驻音量条：与进度条同风格，随时可拖，直接改系统媒体音量 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:paddingBottom="10dp">
-
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/ic_volume_down"
-            android:layout_width="@dimen/icon_size"
-            android:layout_height="@dimen/icon_size"
-            android:src="@drawable/ic_volume_down_grey_600_18dp" />
-
-        <SeekBar
-            android:id="@+id/volume_seek"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp" />
-
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/ic_volume_up"
-            android:layout_width="@dimen/icon_size"
-            android:layout_height="@dimen/icon_size"
-            android:src="@drawable/ic_volume_up_grey_600_18dp" />
-    </LinearLayout>
 
 </LinearLayout>
