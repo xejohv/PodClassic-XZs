@@ -82,42 +82,45 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 
 ---
 
-## 构建 / Build
+## 部署 / Deploy
 
-需要 JDK 17 + Android SDK (compileSdk 34)。
+**完整部署手册（含恢复出厂后 25 分钟重建清单、验收表、排障）：[docs/DEPLOY.md](./docs/DEPLOY.md)**
+**交给 AI 一键部署的提示词：[docs/AI-DEPLOY.md](./docs/AI-DEPLOY.md)**
 
-```bash
-# local.properties 需提供签名口令（该文件不入库）
-pod.storePassword=***
-pod.keyAlias=podclassic
-pod.keyPassword=***
+三步概要（细节看手册）：
 
-./gradlew assembleRelease
-```
-
-`app/build.gradle` 从 `local.properties` 读取签名口令；未提供时产出的 APK 不具备发布签名。
-
----
-
-## 安装与整机配置 / Install
-
-```bash
-adb install -r PodClassicXZs_v1.5.17.apk
-
-# 设为唯一桌面
-adb shell cmd package set-home-activity --user 0 io.github.xejohv.podclassicxzs/io.github.xejohv.podclassicxzs.activity.MainActivity
-
-# 全屏沉浸，不显示状态栏/导航栏
-adb shell settings put global policy_control immersive.full=*
-adb shell wm overscan 0,0,0,-162
-
-# 手势服务
+```powershell
+# 1) 构建（JDK 17 + Android SDK 34）
+cmd /c ".\gradlew.bat :app:assembleRelease --no-daemon"
+# 2) 装机（首次需在手机上允许 USB 调试）
+adb install -r app\build\outputs\apk\release\app-release.apk
+# 3) 绑定无障碍（每次重装都要重做；否则手势/电源菜单/插线应答全失效）
+adb shell settings put secure accessibility_enabled 0
 adb shell settings put secure enabled_accessibility_services io.github.xejohv.podclassicxzs/io.github.xejohv.podclassicxzs.gestures.GestureService
 adb shell settings put secure accessibility_enabled 1
 ```
 
+- 签名读 `local.properties` + 仓库根 `podclassic.keystore`（两者都不入库）。缺失时自动退回 debug 签名：能装，但与旧正式签名版本不兼容，覆盖安装会要求卸载重装（会清存档）。
+- **请备份 keystore 与 local.properties**，这是长期原地升级的唯一凭证。
+
 ---
 
+## 插线传音乐 / USB MTP
+
+| 场景 | 是否需要人工授权 |
+| --- | --- |
+| 已绑定无障碍后，插到任意 Windows 10/11 电脑传歌 | **不需要**：「选择 USB 使用方式」面板会自动选「传输文件」；部分 ROM 的「允许访问设备数据」弹窗也会自动点「允许」（1.5.71 起） |
+| 换一台新电脑用 adb 装包/调试 | **需要**：新电脑首次要在手机上点一次「允许 USB 调试」（系统级安全机制，不代答） |
+| macOS | 装 OpenMTP / Android File Transfer，手机侧同样自动传输文件 |
+| Linux | libmtp / gvfs-mtp |
+
+前提与注意：
+
+- 无障碍服务必须处于开启状态，否则插线会停在「为此设备充电」，电脑看不到存储。
+- Android 8 的 MTP 需要**先解锁屏幕**再插线，否则电脑里看不到文件。
+- 自动应答只在文案同时匹配时才动手（「为此设备充电」+「传输文件」；或「允许访问设备数据」+「拒绝」+「允许」），不会误点其它权限框。
+
+---
 ## 说明 / Notes
 
 - 本包按单机使用场景调整（隐藏系统 UI、单一桌面、USB 默认 MTP），不作为通用播放器发布。

@@ -2,9 +2,11 @@ package io.github.xejohv.podclassicxzs.game
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
+import android.graphics.RectF
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.random.Random
@@ -24,6 +26,9 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
     private class Particle(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Float, var size: Float)
 
     private var playerX = 0.5f
+
+    /** 纵向位置（0 = 画面顶，1 = 战况带上沿）：飞机可以上下飞，不再只能左右平移 */
+    private var playerY = 0.82f
     private var bullets = ArrayList<Bullet>()
     private var eBullets = ArrayList<Bullet>()
     private var enemies = ArrayList<Enemy>()
@@ -45,13 +50,17 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
 
     override fun barStyle(): Int = BAR_NONE
 
+    /** 飞机会跟着手指上下飞，所以上滑折叠只在顶部标题区生效，免得一往上飞就被折叠 */
+    override fun collapseSwipeFromTopOnly(): Boolean = true
+
     /** 左下角炸弹按钮的圆心与半径（绘制与命中共用） */
     private fun bombCX(content: Rect): Float = content.left + dp(56f)
-    private fun bombCY(content: Rect): Float = content.bottom - dp(32f)
+    private fun bombCY(content: Rect): Float = content.bottom - dp(28f)
     private fun bombR(): Float = dp(20f)
 
     override fun resetGame() {
         playerX = 0.5f
+        playerY = 0.82f
         bullets.clear()
         eBullets.clear()
         enemies.clear()
@@ -104,7 +113,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         fireTimer += dt
         if (fireTimer >= 380f) {
             fireTimer = 0f
-            bullets.add(Bullet(playerX, 0.75f))
+            bullets.add(Bullet(playerX, playerY - 0.03f))
         }
 
         spawnTimer += dt
@@ -183,7 +192,9 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
 
         // 敌机撞我方
         if (invincible <= 0f) {
-            val rammed = enemies.firstOrNull { abs(it.x - playerX) < it.r + 0.05f && it.y > 0.70f }
+            val rammed = enemies.firstOrNull {
+                abs(it.x - playerX) < it.r + 0.05f && abs(it.y - playerY) < it.r + 0.06f
+            }
             if (rammed != null) {
                 enemies.remove(rammed)
                 boom(rammed.x, rammed.y, 12)
@@ -199,7 +210,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
 
         // 敌弹打到我方
         if (invincible <= 0f) {
-            val hit = eBullets.firstOrNull { abs(it.x - playerX) < 0.05f && it.y > 0.74f }
+            val hit = eBullets.firstOrNull { abs(it.x - playerX) < 0.05f && abs(it.y - playerY) < 0.055f }
             if (hit != null) {
                 eBullets.remove(hit)
                 boom(hit.x, hit.y, 8)
@@ -229,13 +240,17 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         particles.removeAll { it.life <= 0f }
     }
 
-    /** 手指横向拖动：飞机直接跟到手指对应的 x */
+    /** 手指拖动：飞机直接跟到手指的 x/y（纵向也能飞，不再是只能左右平移） */
     override fun onDragContent(x: Float, y: Float): Boolean {
         val c = contentRect()
-        if (c.width() <= 0) {
+        if (c.width() <= 0 || c.height() <= 0) {
             return false
         }
         playerX = ((x - c.left) / c.width().toFloat()).coerceIn(0.08f, 0.92f)
+        val hudTop = c.bottom - dp(56f)
+        val oy = c.top + dp(10f)
+        val mapH = (hudTop - oy).coerceAtLeast(dp(120f))
+        playerY = ((y - oy) / mapH).coerceIn(0.26f, 0.94f)
         return true
     }
 
@@ -292,12 +307,13 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         val ox = content.left.toFloat()
         val oy = content.top.toFloat()
         // 底部 HUD 单独占一条，游戏内容只映射到它以上的游戏区，避免飞机与炸弹/生命重叠
-        val hudTop = content.bottom - dp(60f)
-        // 展开态：内容只映射到 HUD 以上的游戏区；全屏态沿用整块高度，保持原来的手感
-        val mapH = if (expanded) h else (hudTop - oy).coerceAtLeast(dp(120f))
+        val hudTop = content.bottom - dp(56f)
+        // 全屏与半屏都用「HUD 以上」的整块高度：敌人和战机都不会落到炸弹/生命那一行，
+        // 全屏时画面因此整体下移、铺满操作条以上区域
+        val mapH = (hudTop - oy).coerceAtLeast(dp(120f))
 
         // 背景星点（缓慢下移，给画面一点纵深）
-        fillPaint.color = 0x33FFFFFF
+        fillPaint.color = 0x1F1D1D1D
         val stars = 26
         for (i in 0 until stars) {
             val sx = ((i * 37) % 100) / 100f
@@ -307,7 +323,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
 
         // 受击闪白
         if (hitFlash > 0f) {
-            fillPaint.color = 0x2CFFFFFF
+            fillPaint.color = 0x241D1D1D
             canvas.drawRect(content, fillPaint)
         }
 
@@ -330,9 +346,9 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         for (b in bullets) {
             val cx = ox + b.x * w
             val cy = oy + b.y * mapH
-            glowPaint.color = 0x66FFE9A8.toInt()
+            glowPaint.color = 0x33B8860B.toInt()
             canvas.drawRoundRect(cx - w * 0.014f, cy - dp(15f), cx + w * 0.014f, cy + dp(9f), dp(6f), dp(6f), glowPaint)
-            fillPaint.color = 0xFFFFFDF2.toInt()
+            fillPaint.color = 0xFF1D1D1D.toInt()
             canvas.drawRoundRect(cx - w * 0.006f, cy - dp(13f), cx + w * 0.006f, cy + dp(7f), dp(4f), dp(4f), fillPaint)
         }
 
@@ -344,54 +360,108 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
             canvas.drawCircle(ox + p.x * w, oy + p.y * mapH, p.size * w, glowPaint)
         }
 
-        // 底部状态区（HUD）：全屏时用虚线把画面与数据区分开；展开态底部另有提示条，不重复画线
-        if (expanded) {
-            fillPaint.color = 0x552E2514
-            val dashW = dp(14f)
-            val dashGap = dp(9f)
-            var dx = content.left + dp(16f)
-            while (dx < content.right - dp(16f)) {
-                canvas.drawRect(dx, hudTop, minOf(dx + dashW, content.right - dp(16f).toFloat()), hudTop + dp(1.6f), fillPaint)
-                dx += dashW + dashGap
-            }
+        // 底部状态区：不再用虚线"划一刀"，改成一条与画面同色系的浅圆角信息条，
+        // 让炸弹按钮和战况数字有明确的落脚处（上下都居中在条内）
+        if (started) {
+            fillPaint.color = Color.argb(22, 31, 26, 14)
+            canvas.drawRoundRect(
+                RectF(content.left + dp(10f), hudTop + dp(4f),
+                    content.right - dp(10f), content.bottom - dp(4f)),
+                dp(12f), dp(12f), fillPaint
+            )
+            glowPaint.color = Color.argb(46, 31, 26, 14)
+            glowPaint.style = Paint.Style.STROKE
+            glowPaint.strokeWidth = dp(1f)
+            canvas.drawRoundRect(
+                RectF(content.left + dp(10f), hudTop + dp(4f),
+                    content.right - dp(10f), content.bottom - dp(4f)),
+                dp(12f), dp(12f), glowPaint
+            )
+            glowPaint.style = Paint.Style.FILL
         }
 
-        // 左下角：炸弹按钮（图标小一号，拇指原位可达）
-        val bcx = bombCX(content)
-        val bcy = bombCY(content)
-        val br = bombR()
-        fillPaint.color = 0xFF2E2514.toInt()
-        canvas.drawCircle(bcx, bcy, br, fillPaint)
-        glowPaint.color = 0xFFE8D69C.toInt()
-        glowPaint.style = Paint.Style.STROKE
-        glowPaint.strokeWidth = dp(2f)
-        canvas.drawCircle(bcx, bcy, br, glowPaint)
-        glowPaint.style = Paint.Style.FILL
+        // 炸弹按钮与生命值只在开局后出现：预览态还没有战况，画出来只会挤在飞机尾部
+        if (started) {
+            // 左下角：炸弹按钮（图标小一号，拇指原位可达）
+            val bcx = bombCX(content)
+            val bcy = bombCY(content)
+            val br = bombR()
+            fillPaint.color = 0xFF2E2514.toInt()
+            canvas.drawCircle(bcx, bcy, br, fillPaint)
+            glowPaint.color = 0xFF9A6B00.toInt()
+            glowPaint.style = Paint.Style.STROKE
+            glowPaint.strokeWidth = dp(2f)
+            canvas.drawCircle(bcx, bcy, br, glowPaint)
+            glowPaint.style = Paint.Style.FILL
 
-        textPaint.color = 0xFFFFFDF2.toInt()
-        textPaint.textAlign = Paint.Align.CENTER
-        textPaint.textSize = dp(19f)
-        canvas.drawText("✹", bcx, bcy + dp(6.5f), textPaint)
+            // 按钮里画一枚真正的炸弹（圆弹体 + 引信火花），一眼看得出是"清屏炸弹"
+            drawBombGlyph(canvas, bcx, bcy + dp(3f), dp(13f), 0xFFFFFDF2.toInt(), 0xFFFF6A4A.toInt())
 
-        // 右侧一行数据：炸弹颗数 + 生命
-        textPaint.textAlign = Paint.Align.LEFT
-        textPaint.textSize = dp(15f)
-        textPaint.color = 0xFF1F1A0E.toInt()
-        val tx = bcx + br + dp(14f)
-        canvas.drawText("✹ $bombs    生命 $lives", tx, bcy + dp(5f), textPaint)
+            // 右侧战况：×颗数 · 生命 ×n，和按钮同一条水平中线
+            textPaint.textAlign = Paint.Align.LEFT
+            textPaint.textSize = dp(15f)
+            textPaint.color = 0xFF1F1A0E.toInt()
+            val tx = bcx + br + dp(14f)
+            val ty = bcy - (textPaint.ascent() + textPaint.descent()) / 2f
+            canvas.drawText("×$bombs    生命 ×$lives", tx, ty, textPaint)
+        }
 
-        // 我方战机（闪烁表示无敌时间）
+        // 我方战机（闪烁表示无敌时间）：纵向跟着手指走，尾焰不探进底部战况条
         val blink = invincible > 0f && ((invincible.toInt() / 120) % 2 == 0)
         if (!blink) {
-            drawPlayer(canvas, ox + playerX * w, oy + mapH * (if (expanded) 0.74f else 0.80f), w * 0.085f)
+            val py = oy + mapH * playerY.coerceIn(0.26f, 0.94f)
+            drawPlayer(canvas, ox + playerX * w, py, w * 0.085f)
         }
+    }
+
+    /**
+     * 炸弹图标：航空炸弹剪影——泪滴弹体（鼻尖朝下）+ 两侧尾翼 + 顶端引信火花。
+     * 小尺寸下剪影比"圆球 + ✹"更容易一眼认出是炸弹。
+     */
+    private fun drawBombGlyph(canvas: Canvas, cx: Float, cy: Float, s: Float, body: Int, spark: Int) {
+        // 弹体
+        path.reset()
+        path.moveTo(cx - s * 0.32f, cy - s * 0.24f)
+        path.quadTo(cx - s * 0.56f, cy + s * 0.32f, cx, cy + s * 0.94f)
+        path.quadTo(cx + s * 0.56f, cy + s * 0.32f, cx + s * 0.32f, cy - s * 0.24f)
+        path.close()
+        fillPaint.color = body
+        canvas.drawPath(path, fillPaint)
+        // 尾翼（左右各一片，斜向上张开）
+        path.reset()
+        path.moveTo(cx - s * 0.32f, cy - s * 0.24f)
+        path.lineTo(cx - s * 0.60f, cy - s * 0.62f)
+        path.lineTo(cx - s * 0.36f, cy - s * 0.62f)
+        path.lineTo(cx - s * 0.20f, cy - s * 0.34f)
+        path.close()
+        canvas.drawPath(path, fillPaint)
+        path.reset()
+        path.moveTo(cx + s * 0.32f, cy - s * 0.24f)
+        path.lineTo(cx + s * 0.60f, cy - s * 0.62f)
+        path.lineTo(cx + s * 0.36f, cy - s * 0.62f)
+        path.lineTo(cx + s * 0.20f, cy - s * 0.34f)
+        path.close()
+        canvas.drawPath(path, fillPaint)
+        // 引信火花：顶端三道短辐射
+        glowPaint.color = spark
+        glowPaint.style = Paint.Style.STROKE
+        glowPaint.strokeWidth = dp(1.6f)
+        for (i in -1..1) {
+            val a = (-90f + i * 34f) * 0.017453292f
+            canvas.drawLine(
+                cx + (s * 0.14f) * kotlin.math.cos(a), cy - s * 0.50f + (s * 0.10f) * kotlin.math.sin(a),
+                cx + (s * 0.34f) * kotlin.math.cos(a), cy - s * 0.50f + (s * 0.34f) * kotlin.math.sin(a),
+                glowPaint
+            )
+        }
+        glowPaint.style = Paint.Style.FILL
     }
 
     private fun drawPlayer(canvas: Canvas, cx: Float, cy: Float, size: Float) {
         // 尾焰
-        glowPaint.color = 0xAAFFD978.toInt()
+        glowPaint.color = 0x66C08A16.toInt()
         canvas.drawCircle(cx, cy + size * 0.72f, size * 0.20f, glowPaint)
-        glowPaint.color = 0x55FFD978.toInt()
+        glowPaint.color = 0x33C08A16.toInt()
         canvas.drawCircle(cx, cy + size * 0.86f, size * 0.30f, glowPaint)
 
         // 机身：深色实心 + 亮金描边，保证在金色背景上清楚
@@ -410,7 +480,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         fillPaint.color = 0xFF1F1A0E.toInt()
         canvas.drawPath(path, fillPaint)
 
-        glowPaint.color = 0xFFE8D69C.toInt()
+        glowPaint.color = 0xFF9A6B00.toInt()
         glowPaint.style = Paint.Style.STROKE
         glowPaint.strokeWidth = dp(2.4f)
         canvas.drawPath(path, glowPaint)
@@ -439,7 +509,7 @@ class ShooterGame(context: Context) : GameHost(context, "飞机大战") {
         fillPaint.color = if (big) 0xFF4A3A16.toInt() else 0xFF5A4C22.toInt()
         canvas.drawPath(path, fillPaint)
 
-        glowPaint.color = if (big) 0xFFFFB86B.toInt() else 0xFFFFE2A8.toInt()
+        glowPaint.color = if (big) 0xFFB0572B.toInt() else 0xFF8A6A1A.toInt()
         glowPaint.style = Paint.Style.STROKE
         glowPaint.strokeWidth = dp(2f)
         canvas.drawPath(path, glowPaint)

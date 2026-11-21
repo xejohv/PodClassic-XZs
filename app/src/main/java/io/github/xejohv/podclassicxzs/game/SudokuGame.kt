@@ -37,7 +37,44 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
     /** 不要底部操作条：数字改用画面内的数字行，选格用触摸 */
     override fun barStyle(): Int = BAR_NONE
 
-    override fun startHint(): String = "点格子 选中 · 点下方数字 填入 · 长按格子 清空"
+    override fun startHint(): String = "点格子选中 · 点下方数字填入"
+
+    override fun startHintSub(): String = "长按格子 清空"
+
+    override fun gameOverTitle(): String = "全部填对"
+
+    // ---------------- 存档 ----------------
+
+    override fun supportsSave(): Boolean = true
+
+    private fun pack(arr: IntArray): String {
+        val sb = StringBuilder(arr.size)
+        for (v in arr) sb.append(v.coerceIn(0, 9).toString())
+        return sb.toString()
+    }
+
+    private fun unpack(s: String, out: IntArray) {
+        for (i in out.indices) {
+            out[i] = s.getOrNull(i)?.digitToIntOrNull() ?: 0
+        }
+    }
+
+    override fun onSaveState(): String {
+        return sel.toString() + "|" + score + "|" + (if (solvedOnce) 1 else 0) + "|" +
+                pack(solution) + "|" + pack(puzzle) + "|" + pack(value)
+    }
+
+    override fun onRestoreState(data: String) {
+        val p = data.split('|')
+        if (p.size < 6) throw IllegalArgumentException("bad sudoku save")
+        sel = p[0].toInt()
+        score = p[1].toInt()
+        solvedOnce = p[2] == "1"
+        unpack(p[3], solution)
+        unpack(p[4], puzzle)
+        unpack(p[5], value)
+        gameOver = false
+    }
 
     /** 数字行：仅在全屏、已开局、且选中了一个可填写的空格时出现 */
     private fun digitsVisible(): Boolean =
@@ -45,10 +82,11 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
 
     private fun padRect(): Rect {
         val content = contentRect()
-        // 两排数字（1-5 / 6-9 + ✕），每排留足呼吸空间
+        // 两排数字（1-5 / 6-9 + ✕），紧贴棋盘下沿，不再贴着屏幕最底边留出一个大空档
         val h = dp(112f).toInt()
         val side = dp(12f).toInt()
-        return Rect(content.left + side, content.bottom - h, content.right - side, content.bottom)
+        val top = boardRect().bottom + dp(12f).toInt()
+        return Rect(content.left + side, top, content.right - side, top + h)
     }
 
 
@@ -233,13 +271,15 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
     }
 
     private fun boardRect(): Rect {
-        val content = contentRect()
-        val top0 = content.top + dp(14f)
-        val padH = if (digitsVisible()) dp(112f) + dp(10f) else 0f
-        val availH = (content.bottom - dp(14f) - padH) - top0
+        val content = playRect()
+        // 棋盘 + 数字行当成一整块：在内容区里垂直居中；数字行收起时棋盘自己吃满并居中
+        val padH = if (digitsVisible()) dp(112f) + dp(12f) else 0f
+        val availH = content.height() - padH
         val size = min(content.width().toFloat() - dp(16f), availH).toInt()
         val left = content.left + (content.width() - size) / 2
-        val top = (top0 + (availH - size) * 0f).toInt()   // 棋盘上移，减少顶部空白
+        // 在整块屏的高度上居中（不是只在内容区居中），上下留白看起来才对称
+        val centered = (height - (size + padH)) / 2f
+        val top = maxOf(content.top.toFloat(), centered).toInt()
         return Rect(left, top, left + size, top + size)
     }
 
@@ -248,7 +288,7 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
         val cell = rect.width() / 9f
 
         // 底
-        fillPaint.color = 0x22FFFFFF
+        fillPaint.color = 0x121D1D1D
         canvas.drawRect(rect, fillPaint)
 
         // 选中的格子
@@ -263,7 +303,7 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
         }
 
         // 细网格
-        gridPaint.color = 0x66FFFFFF
+        gridPaint.color = 0x331D1D1D
         gridPaint.strokeWidth = dp(1f)
         for (i in 0..9) {
             canvas.drawLine(rect.left + i * cell, rect.top.toFloat(), rect.left + i * cell, rect.bottom.toFloat(), gridPaint)
@@ -292,7 +332,7 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
             numPaint.color = when {
                 given != 0 -> 0xFF1F1A0E.toInt()
                 wrong -> 0xFFC0392B.toInt()
-                else -> 0xFF8C7A3B.toInt()
+                else -> 0xFF7A5F16.toInt()
             }
             val cx = rect.left + c * cell + cell / 2f
             val cy = rect.top + r * cell + cell * 0.76f
@@ -301,13 +341,9 @@ class SudokuGame(context: Context) : GameHost(context, "数独") {
         numPaint.textAlign = Paint.Align.LEFT
 
         if (gameOver && solvedOnce) {
-            fillPaint.color = 0xCCE8D69C.toInt()
+            // 过关提示交给基类的结束卡片，这里只把棋盘压暗一点，别叠两层文字
+            fillPaint.color = 0x339A6B00.toInt()
             canvas.drawRect(rect, fillPaint)
-            textPaint.color = COLOR_DEEP
-            textPaint.textSize = dp(22f)
-            textPaint.textAlign = Paint.Align.CENTER
-            canvas.drawText("完成！", rect.centerX().toFloat(), rect.centerY().toFloat(), textPaint)
-            textPaint.textAlign = Paint.Align.LEFT
         }
 
         // 数字行：只在选中可填空格时浮出，1-9 + ✕

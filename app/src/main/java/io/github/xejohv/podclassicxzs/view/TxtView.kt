@@ -11,6 +11,9 @@ class TxtView :
 
     private val title : String
 
+    /** 点击中间键时的动作；彩蛋页用它跳系统设置，普通文本页为 null */
+    var onEnter: (() -> Boolean)? = null
+
     constructor(context: Context, title : String, text : String) : super(context) {
         this.text = text
         this.title = title
@@ -29,7 +32,7 @@ class TxtView :
     }
 
     override fun enter(): Boolean {
-        return false
+        return onEnter?.invoke() ?: false
     }
 
     override fun enterLongClick(): Boolean {

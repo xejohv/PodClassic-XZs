@@ -40,17 +40,19 @@ class CoverPlaceholderDrawable(
         val w = b.width().toFloat()
         val h = b.height().toFloat()
 
-        // 底色跟随机身配色：浅色主题用深一档做底，暗黑主题反过来用亮一档，避免整块糊黑
+        // 底色跟随机身配色：浅色主题走白底 + 极浅灰（和原版 iPod 白屏一致），
+        // 暗黑主题反过来用深色，避免整块惨白
         val dark = Colors.isDark
-        val c1 = if (dark) Colors.background_light else Colors.background_dark_2
-        val c2 = if (dark) Colors.background
-        else Color.rgb(Color.red(c1) * 55 / 100, Color.green(c1) * 55 / 100, Color.blue(c1) * 55 / 100)
+        val c1 = if (dark) Colors.background_light else Colors.background
+        val c2 = if (dark) Colors.background else 0xFFF1F1ED.toInt()
         bgPaint.shader = LinearGradient(
             b.left.toFloat(), b.top.toFloat(), b.left.toFloat(), b.bottom.toFloat(),
             c1, c2, Shader.TileMode.CLAMP
         )
         canvas.drawRect(b, bgPaint)
         bgPaint.shader = null
+        // 音符在浅色底上要用深墨色，否则白音符在白底上看不见
+        notePaint.color = if (dark) Colors.selected_text else Colors.text
 
         // 不再画金线内框：封面图会被铺满放大并裁切，框线会露在屏幕边缘像一条竖线
 

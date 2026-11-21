@@ -278,7 +278,7 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_RIGHT)
         containerParams.addRule(RelativeLayout.ALIGN_PARENT_TOP)
         addView(coverContainer, containerParams)
-        coverContainer.setBackgroundColor(Colors.background_dark_2)
+        coverContainer.setBackgroundColor(Colors.background)
 
         // 设置图片视图的初始布局参数，实际尺寸将在图片加载后根据比例计算
         val imageParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
@@ -346,32 +346,9 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                 }
             }, true),
             RecyclerListView.Item(Strings.PHOTO, object : RecyclerListView.OnItemClickListener {
-                val list by lazy { MediaStoreUtil.getPhotoList() }
-                private fun getItemList(): ArrayList<RecyclerListView.Item> {
-                    val itemList = ArrayList<RecyclerListView.Item>()
-                    for (file in list) {
-                        itemList.add(RecyclerListView.Item(file.name, null, false))
-                    }
-                    return itemList
-                }
-
                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    Core.addView(
-                        ItemListView(
-                            context,
-                            getItemList(),
-                            Strings.PHOTO,
-                            object : RecyclerListView.OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    Core.addView(ImageView(context, list, index))
-                                    return true
-                                }
-
-                                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
-                                    return false
-                                }
-                            })
-                    )
+                    // 照片页改成缩略图墙：3×2 格子、每格一张图，比纯文件名列表直观
+                    Core.addView(PhotoGridView(context))
                     return true
                 }
 
@@ -421,45 +398,9 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
             }, true),
 
             RecyclerListView.Item(Strings.FILE, object : RecyclerListView.OnItemClickListener {
-                private fun getItemList(): ArrayList<RecyclerListView.Item>? {
-                    val sdCardPath = FileUtil.getSDCardPath() ?: return null
-                    val itemList = ArrayList<RecyclerListView.Item>()
-                    itemList.add(RecyclerListView.Item(Strings.INTERNAL_STORAGE, object : RecyclerListView.OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            Core.addView(
-                                FileView(
-                                    context,
-                                    Environment.getRootDirectory()
-                                )
-                            )
-                            return true
-                        }
-
-                        override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
-                            return false
-                        }
-                    }, true))
-
-                    itemList.add(RecyclerListView.Item(Strings.SDCARD, object : RecyclerListView.OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            Core.addView(FileView(context, File(sdCardPath)))
-                            return true
-                        }
-
-                        override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
-                            return false
-                        }
-                    }, true))
-                    return itemList
-                }
-
                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    val itemList = getItemList()
-                    if (itemList == null) {
-                        Core.addView(FileView(context, Environment.getExternalStorageDirectory()))
-                    } else {
-                        Core.addView(ItemListView(context, itemList, Strings.FILE, null))
-                    }
+                    // 文件页是一张合并列表：手机存储/Music 与 SD 卡的内容平铺在一起，不再分两级
+                    Core.addView(FileView(context, musicRoots(), Strings.FILE))
                     return true
                 }
 
@@ -1285,5 +1226,29 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
         isAnimating = false
         xAnimator?.cancel()
         yAnimator?.cancel()
+    }
+
+    /**
+     * 「文件」页的根目录集合：手机存储/Music + SD 卡的曲库位置。
+     * 两处内容在列表里平铺合并，用户不需要知道哪首歌存在哪儿。
+     * SD 卡有 Music 目录就用它，没有就把卡根当曲库（专辑常常直接堆在卡根）。
+     */
+    private fun musicRoots(): List<File> {
+        val out = ArrayList<File>(2)
+        val internalMusic = File(Environment.getExternalStorageDirectory(), "Music")
+        if (!internalMusic.exists()) {
+            internalMusic.mkdirs()
+        }
+        out.add(internalMusic)
+        val sd = try {
+            FileUtil.getSDCardPath()?.let(::File)
+        } catch (e: Exception) {
+            null
+        }
+        if (sd != null && sd.isDirectory) {
+            val sdMusic = File(sd, "Music")
+            out.add(if (sdMusic.isDirectory) sdMusic else sd)
+        }
+        return out
     }
 }

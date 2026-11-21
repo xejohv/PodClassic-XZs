@@ -182,7 +182,7 @@ class Screen(context: Context, attributeSet: AttributeSet?) : LinearLayout(conte
      */
     private fun drawNormalBackground(canvas: Canvas) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = Colors.screen
+        paint.color = Colors.background
         canvas.drawRoundRect(
             0f, 0f, width.toFloat(), height.toFloat(),
             cornerRadius, cornerRadius, paint

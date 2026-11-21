@@ -1,13 +1,16 @@
 package io.github.xejohv.podclassicxzs.view
 
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
+import android.provider.Settings
 import android.util.Base64
 import io.github.xejohv.podclassicxzs.activity.MainActivity
 import io.github.xejohv.podclassicxzs.base.Core
 import io.github.xejohv.podclassicxzs.base.ScreenView
+import io.github.xejohv.podclassicxzs.gestures.GestureService
 import io.github.xejohv.podclassicxzs.media.PlayMode
 import io.github.xejohv.podclassicxzs.media.RepeatMode
 import io.github.xejohv.podclassicxzs.service.MediaPresenter
@@ -67,14 +70,47 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                                 ),
                                 Item(Strings.VERSION, object : OnItemClickListener {
                                     var count = 0
+                                    var lastClickMs = 0L
                                     override fun onItemClick(
                                         index: Int,
                                         listView: RecyclerListView
                                     ): Boolean {
+                                        // 一次触摸会被列表派发多次（先选中再进入），
+                                        // 300ms 内的重复回调只算一次，保证"点 6 次"就是 6 次
+                                        val now = android.os.SystemClock.elapsedRealtime()
+                                        if (now - lastClickMs < 300L) {
+                                            return true
+                                        }
+                                        lastClickMs = now
                                         count++
-                                        if (count == 7) {
+                                        // 点满 6 次翻出 iPod 彩蛋页；再点一下中间键就进系统设置。
+                                        // 计数只活在这一次打开的"关于本机"里，退出去再进来要重新点 6 次。
+                                        if (count >= 6) {
                                             count = 0
-                                            Core.addView(TxtView(context, Strings.ABOUT, about))
+                                            val easterEgg = TxtView(
+                                                context,
+                                                Strings.iPod,
+                                                "iPod"
+                                            )
+                                            easterEgg.gravity = android.view.Gravity.CENTER
+                                            easterEgg.textSize = 54f
+                                            easterEgg.onEnter = {
+                                                try {
+                                                    val intent = Intent(Settings.ACTION_SETTINGS)
+                                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                    context.startActivity(intent)
+                                                    // 这台机器的导航栏被整体拿掉了，系统设置里没有返回按钮，
+                                                    // 所以进去的同时盖一条自己的控制条（返回 / iPod）
+                                                    GestureService.showExitBar(false)
+                                                } catch (e: Exception) {
+                                                    android.util.Log.w("SettingsView", "open system settings failed", e)
+                                                }
+                                                true
+                                            }
+                                            Core.addView(easterEgg)
+                                            // 彩蛋页也常驻一条浮条：全局返回在这台机器上对这个页面不生效，
+                                            // 浮条上的「← 返回」会直接调本体的 home()，保证一定退得出来
+                                            GestureService.showExitBar(false)
                                         }
                                         return true
                                     }

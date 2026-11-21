@@ -22,6 +22,7 @@ import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
 import io.github.xejohv.podclassicxzs.base.Core
 import io.github.xejohv.podclassicxzs.base.ScreenView
+import io.github.xejohv.podclassicxzs.gestures.GestureService
 import io.github.xejohv.podclassicxzs.values.Colors
 import java.io.File
 import java.io.FileOutputStream
@@ -117,16 +118,21 @@ class CameraView(context: Context) : FrameLayout(context), ScreenView {
         Core.setGameExpanded(true)
         // 刚加入的 View 还没测量完，折叠可能被时序冲掉，补一帧
         ui.postDelayed(immerseAgain, 260)
+        // 全屏取景时没有任何可见的退出控件，交给无障碍层盖一条「返回 / iPod」；
+        // 和系统设置页一样贴到屏幕最下沿（raised=false），快门键在它上方，不会被挡住
+        GestureService.showExitBar(false)
     }
 
     override fun onViewRemove() {
         ui.removeCallbacks(immerseAgain)
         releaseCamera()
+        GestureService.hideExitBar()
     }
 
     override fun onViewDelete() {
         ui.removeCallbacks(immerseAgain)
         releaseCamera()
+        GestureService.hideExitBar()
     }
 
     override fun onConfigurationChanged() {

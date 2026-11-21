@@ -2,9 +2,9 @@ package io.github.xejohv.podclassicxzs.view
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.provider.MediaStore
 import io.github.xejohv.podclassicxzs.base.Core
 import io.github.xejohv.podclassicxzs.base.ScreenView
+import io.github.xejohv.podclassicxzs.bean.Music
 import io.github.xejohv.podclassicxzs.bean.MusicList
 import io.github.xejohv.podclassicxzs.service.MediaPresenter
 import io.github.xejohv.podclassicxzs.storage.MusicListTable
@@ -19,27 +19,45 @@ import java.util.*
 
 
 @SuppressLint("ViewConstructor")
-class FileView(context: Context, val file: File) : RecyclerListView(context), ScreenView {
+class FileView(context: Context, val roots: List<File>, private val rootTitle: String? = null) :
+    RecyclerListView(context), ScreenView {
+
+    /** 单目录入口（子目录层级、以及别处按单 File 创建的地方继续用这个） */
+    constructor(context: Context, file: File) : this(context, listOf(file), file.name)
 
     private var hasAudio = false
-    val list: ArrayList<File> = file.let {
-        val array = file.listFiles()
-        val arrayList = ArrayList<File>(array?.size ?: 0)
-        if (array != null) {
-            for (f in array) {
-                if (!f.name.startsWith(".")) {
-                    arrayList.add(f)
-                }
-            }
-            val collator = Collator.getInstance(Locale.getDefault())
-            arrayList.sortWith { o1, o2 -> collator.compare(o1?.name, o2?.name) }
-        }
-        arrayList
-    }
-
+    val list: ArrayList<File> = ArrayList()
     private val musicList = ArrayList<File>(list.size)
 
+    /** 系统目录/别的 App 的资料目录都不显示，只留用户自己的媒体文件 */
+    private val hiddenNames = arrayOf(
+        "android", "dcim", "lost.dir", "system volume information", "tencent", "miui"
+    )
+
     init {
+        // 多个根目录合并成一张列表：同名条目只留第一个（Music 在前），用户不用知道文件到底在哪
+        val merged = ArrayList<File>()
+        val seen = HashSet<String>()
+        for (root in roots) {
+            val array = root.listFiles() ?: continue
+            for (f in array) {
+                if (f.name.startsWith(".")) {
+                    continue
+                }
+                if (hiddenNames.any { it.equals(f.name, ignoreCase = true) }) {
+                    continue
+                }
+                val key = f.name.lowercase(Locale.getDefault())
+                if (!seen.add(key)) {
+                    continue
+                }
+                merged.add(f)
+            }
+        }
+        val collator = Collator.getInstance(Locale.getDefault())
+        merged.sortWith { o1, o2 -> collator.compare(o1?.name, o2?.name) }
+        list.addAll(merged)
+
         if (list.isEmpty()) {
             itemList.add(Item(Strings.EMPTY, null, false))
         } else {
@@ -51,7 +69,6 @@ class FileView(context: Context, val file: File) : RecyclerListView(context), Sc
                 }
                 itemList.add(Item(file.name, null, file.isDirectory))
             }
-
             if (hasAudio) {
                 itemList.add(0, Item(Strings.SHUFFLE_PLAY, null, true))
             }
@@ -64,26 +81,12 @@ class FileView(context: Context, val file: File) : RecyclerListView(context), Sc
             return false
         }
         if (hasAudio && index == 0) {
-            val musics = MediaStoreUtil.getMusicList(
-                "${MediaStore.Audio.Media.DATA} like ? ",
-                arrayOf("${file.path}%")
-            )
-            if (musics.isEmpty()) {
-                musics.ensureCapacity(musicList.size)
-                for (file in musicList) {
-                    val music = MediaStoreUtil.getMusicFromFile(file.path)
-                    if (music != null) {
-                        musics.add(music)
-                    }
-                }
-            } else {
-                val lastIndex = file.path.length
-                val iterator = musics.iterator()
-                while (iterator.hasNext()) {
-                    val music = iterator.next()
-                    if (music.data?.lastIndexOf('/') != lastIndex) {
-                        iterator.remove()
-                    }
+            // 合并列表里的音频合在一起随机播，不再按单个根目录拼前缀
+            val musics = ArrayList<Music>(musicList.size)
+            for (f in musicList) {
+                val music = MediaStoreUtil.getMusicFromFile(f.path)
+                if (music != null) {
+                    musics.add(music)
                 }
             }
             MediaPresenter.shufflePlay(musics)
@@ -130,8 +133,11 @@ class FileView(context: Context, val file: File) : RecyclerListView(context), Sc
             for (f in folder) {
                 if (FileUtil.isAudio(f)) {
                     MusicListTable.folder.add(
-                        MusicList.Builder().apply { type = MusicList.TYPE_FOLDER; title = file.name; data = file.path }
-                            .build()
+                        MusicList.Builder().apply {
+                            type = MusicList.TYPE_FOLDER
+                            title = file.name
+                            data = file.path
+                        }.build()
                     )
                     shake()
                     return true
@@ -153,6 +159,6 @@ class FileView(context: Context, val file: File) : RecyclerListView(context), Sc
     }
 
     override fun getTitle(): String {
-        return file.name
+        return rootTitle ?: roots.firstOrNull()?.name ?: "文件"
     }
 }

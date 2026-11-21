@@ -10,8 +10,8 @@ android {
         applicationId "io.github.xejohv.podclassicxzs"
         minSdk 26
         targetSdk 34
-        versionCode 97
-        versionName "1.5.22"
+        versionCode 105
+        versionName "1.5.71"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -31,9 +31,13 @@ android {
         }
     }
 
+    // 签名兜底：本机存在 keystore 且配置了密码就用正式签名，否则退回 debug 签名
+    def podReady = rootProject.file("podclassic.keystore").exists()
+        && localProps.getProperty("pod.storePassword", "").length() > 0
+
     buildTypes {
         release {
-            signingConfig signingConfigs.pod
+            signingConfig podReady ? signingConfigs.pod : signingConfigs.debug
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             zipAlignEnabled = true

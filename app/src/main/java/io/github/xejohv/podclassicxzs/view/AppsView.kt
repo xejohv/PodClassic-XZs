@@ -3,6 +3,7 @@ package io.github.xejohv.podclassicxzs.view
 import android.content.Context
 import io.github.xejohv.podclassicxzs.base.Core
 import io.github.xejohv.podclassicxzs.bean.App
+import io.github.xejohv.podclassicxzs.gestures.GestureService
 import io.github.xejohv.podclassicxzs.game.BreakoutGame
 import io.github.xejohv.podclassicxzs.game.MinesweeperGame
 import io.github.xejohv.podclassicxzs.game.ShooterGame
@@ -98,10 +99,21 @@ class AppsView(context: Context) : ItemListView(
         }
     }, true)
 
-    // 相机：内嵌在 PodClassic 里（Camera1 自绘界面），出口由自己掌握，不跳系统相机
+    // 相机：直接拉起索尼原厂相机，界面、功能都用系统的；
+    // 因为这台机器的导航栏被整体拿掉了，进外部 App 以后没有返回入口，
+    // 所以同时盖一条自己的控制条（← 返回 / iPod），回本应用时由 onResume 收掉
     private val cameraItem = Item("相机", object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-            Core.addView(CameraView(context))
+            try {
+                val intent = android.content.Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                // 按用户要求贴到屏幕最下沿：原厂相机快门中心在它上方，不会挡住拍照
+                GestureService.showExitBar(false)
+            } catch (e: Exception) {
+                // 兜底：没有系统相机时退回内置相机
+                Core.addView(CameraView(context))
+            }
             return true
         }
     }, true)

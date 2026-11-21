@@ -45,9 +45,9 @@ object Colors {
         bgDark2 = 0xFF9B978D.toInt(),
         text = 0xFF262626.toInt(),
         textSecondary = 0xFF55524B.toInt(),
-        line = 0xFF8C887F.toInt(),
-        divider = 0xFFB9B5AC.toInt(),
-        main = 0xFF78746B.toInt(),
+        line = 0xFF7A766F.toInt(),
+        divider = 0xFF8F8C85.toInt(),
+        main = 0xFF6C6860.toInt(),
         mainLight = 0xFFA9A59B.toInt(),
         mainDark = 0xFF5B584F.toInt(),
         disc = 0xFFC81E1E.toInt(),
@@ -66,12 +66,12 @@ object Colors {
         text = 0xFFF5F5F5.toInt(),
         textSecondary = 0xFFC8C8C8.toInt(),
         line = 0xFF8A8A8A.toInt(),
-        divider = 0xFF4E4E4E.toInt(),
+        divider = 0xFF585858.toInt(),
         main = 0xFFC4C4C4.toInt(),
         mainLight = 0xFFE0E0E0.toInt(),
         mainDark = 0xFF909090.toInt(),
         disc = 0xFFC81E1E.toInt(),
-        discInner = 0xFF2C2C2C.toInt(),
+        discInner = 0xFF1B1B1B.toInt(),
         selTop = 0xFF5C5C5C.toInt(),
         selBottom = 0xFF303030.toInt(),
         selText = 0xFFFFFFFF.toInt()
@@ -85,8 +85,8 @@ object Colors {
         bgDark2 = 0xFF8AA2B5.toInt(),
         text = 0xFF12242F.toInt(),
         textSecondary = 0xFF3A5464.toInt(),
-        line = 0xFF7B96A9.toInt(),
-        divider = 0xFF99B1C2.toInt(),
+        line = 0xFF667D8D.toInt(),
+        divider = 0xFF7E92A0.toInt(),
         main = 0xFF46697F.toInt(),
         mainLight = 0xFF7E9CAF.toInt(),
         mainDark = 0xFF33505F.toInt(),
@@ -105,12 +105,12 @@ object Colors {
         bgDark2 = 0xFFACB44A.toInt(),
         text = 0xFF232709.toInt(),
         textSecondary = 0xFF4A4F16.toInt(),
-        line = 0xFF8E9440.toInt(),
-        divider = 0xFFAAB063.toInt(),
+        line = 0xFF80853A.toInt(),
+        divider = 0xFF959B57.toInt(),
         main = 0xFF6E7422.toInt(),
         mainLight = 0xFFA8AE52.toInt(),
         mainDark = 0xFF4E5314.toInt(),
-        disc = 0xFF1D2008.toInt(),
+        disc = 0xFFC81E1E.toInt(),
         discInner = 0xFFD2D96A.toInt(),
         selTop = 0xFF3C4012.toInt(),
         selBottom = 0xFF24280A.toInt(),
@@ -153,16 +153,62 @@ object Colors {
         invalidateTheme()
     }
 
-    val text get() = p.text
-    val text_secondary get() = p.textSecondary
-    val text_light get() = ContextCompat.getColor(BaseApplication.context, R.color.text_light)
+    /** 面板文字：LCD 墨色。机身底上的字请用 ink_on_body */
+    val text get() = if (lightPanel) LCD_TEXT else p.text
+    val text_secondary get() = if (lightPanel) LCD_TEXT_2 else p.textSecondary
+    val text_light get() = if (lightPanel) LCD_TEXT_2 else ContextCompat.getColor(BaseApplication.context, R.color.text_light)
+
+    /**
+     * 内容面板（控制盘以上的整块界面，含标题栏与列表）永远是浅色 LCD。
+     *
+     * 原版 iPod Classic 无论外壳是银、黑还是别的颜色，屏幕里始终是同一块
+     * 白底黑字的单色 LCD —— 黑色版只是外壳黑，菜单并不是黑的。
+     * 所以这里不再按机身明暗切换面板，机身色只出现在外壳、转盘、浮层边缘。
+     */
+    private val lightPanel: Boolean get() = true
+
+    /** LCD 面板的墨色：近黑的中性灰，不掺机身色，四种外壳下都读得清 */
+    private const val LCD_TEXT = 0xFF1D1D1D.toInt()
+    private const val LCD_TEXT_2 = 0xFF5C5C5C.toInt()
 
     val color_primary get() = p.bg
-    val background get() = p.bg
-    val background_light get() = p.bgLight
-    val divider_light get() = p.divider
-    val background_dark_1 get() = p.bgDark1
-    val background_dark_2 get() = p.bgDark2
+    /** 机身色的亮阶（不受"内容面板用白底"影响），用于需要跟随机身色又不与主色糊在一起的浮层 */
+    val body_light get() = p.bgLight
+    /** 机身色的暗阶 */
+    val body_dark get() = p.bgDark1
+
+    /**
+     * 机身色底上的墨色（锁屏页那种"直接写在机身色上"的地方用）。
+     * 面板上的文字用 text（LCD 墨），这里给机身色底留一个不随面板走的入口。
+     */
+    val ink_on_body get() = p.text
+
+    /** LCD 面板底色：近白，掺一点点机身色（约 8%），四种外壳都显得是同一块屏，又各自协调 */
+    val lcd_panel: Int
+        get() = mix(0xFFFCFCFA.toInt(), p.bg, 0.08f)
+
+    private fun mix(a: Int, b: Int, t: Float): Int {
+        val r = (android.graphics.Color.red(a) * (1 - t) + android.graphics.Color.red(b) * t).toInt()
+        val g = (android.graphics.Color.green(a) * (1 - t) + android.graphics.Color.green(b) * t).toInt()
+        val bl = (android.graphics.Color.blue(a) * (1 - t) + android.graphics.Color.blue(b) * t).toInt()
+        return android.graphics.Color.rgb(r, g, bl)
+    }
+
+    /** 机身色的"压暗版"（明度乘以 factor），用于电源菜单那类需要深色背景的浮层 */
+    fun bodyDarkened(factor: Float): Int {
+        val c = p.bg
+        return android.graphics.Color.rgb(
+            (android.graphics.Color.red(c) * factor).toInt(),
+            (android.graphics.Color.green(c) * factor).toInt(),
+            (android.graphics.Color.blue(c) * factor).toInt()
+        )
+    }
+    val background get() = if (lightPanel) 0xFFFFFFFF.toInt() else p.bg
+    val background_light get() = if (lightPanel) 0xFFFDFDFB.toInt() else p.bgLight
+    /** 白底面板上的分界线：原来是 D8D8D2（白底上只有 1.4，几乎看不见），提到 1.9 才分得出层级 */
+    val divider_light get() = if (lightPanel) 0xFFC4C4BE.toInt() else p.divider
+    val background_dark_1 get() = if (lightPanel) 0xFFF2F2EE.toInt() else p.bgDark1
+    val background_dark_2 get() = if (lightPanel) 0xFFE4E4DE.toInt() else p.bgDark2
     val line get() = p.line
 
     val main get() = p.main
@@ -203,19 +249,42 @@ object Colors {
     /** 屏幕底色 = 机身色，整块屏幕与机身同色系 */
     val screen: Int get() = p.bg
 
-    /** 屏幕纵向渐变（顶部略亮，底部略深） */
+    /** 屏幕纵向渐变：白底极浅渐变，暗黑机身保持深色 */
     val screenGradient: IntArray
-        get() = intArrayOf(p.bgDark1, p.bg, p.bgDark1, p.bgDark2)
+        get() = if (lightPanel) intArrayOf(
+            0xFFFFFFFF.toInt(),
+            0xFFFEFEFE.toInt(),
+            0xFFFCFCFA.toInt(),
+            0xFFF8F8F5.toInt()
+        ) else intArrayOf(p.bgDark1, p.bg, p.bgDark1, p.bgDark2)
 
     // 专辑封面占位音符
-    val coverPlaceholderBg get() = p.bgLight
+    val coverPlaceholderBg get() = if (lightPanel) 0xFFF4F4EF.toInt() else p.bgLight
     val coverPlaceholderInk get() = p.text
 
-    // 游戏通用三色（与播放器同一套）
-    val gameBg get() = p.bg
-    val gameInk get() = p.text
-    val gameAccent get() = p.main
-    val gameDeep get() = p.selBottom
+    // ---------------- 游戏层 ----------------
+    /**
+     * 游戏也长在屏幕上，所以底子跟主菜单一样走 LCD 浅色，不再跟机身色走。
+     * 原来 gameBg 直接取机身色，暗黑机身下整块游戏区是深灰 + 深色元素，几乎看不清。
+     * 现在四种外壳的游戏区都是同一块近白屏，靠"深墨元素"表达画面。
+     */
+    val gameBg get() = lcd_panel
+    val gameInk get() = LCD_TEXT
+    val gameInkSoft get() = LCD_TEXT_2
+    /** 浅色游戏面板上的强调色：机身主题色如果太浅（暗黑机身的 C4C4C4）就压到中性深灰 */
+    val gameAccent: Int
+        get() {
+            val c = p.main
+            val lum = (android.graphics.Color.red(c) * 299 + android.graphics.Color.green(c) * 587 +
+                    android.graphics.Color.blue(c) * 114) / 1000
+            return if (lum > 148) 0xFF4A4A46.toInt() else c
+        }
+    /** 键帽 / 图标 / 描边用的深墨 */
+    val gameDeep get() = 0xFF1F1F1F.toInt()
+    /** 游戏面板上的浅灰"纸张二宫格"：棋盘、面板底、未开格子的浅色内衬 */
+    val gamePaper get() = mix(0xFFECEBE4.toInt(), p.bg, 0.10f)
+    /** 游戏面板上的一条细线 */
+    val gameLine get() = mix(0xFFD2D1C8.toInt(), p.bg, 0.12f)
 
     fun getShader(
         x0: Float,
