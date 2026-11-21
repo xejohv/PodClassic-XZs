@@ -40,6 +40,8 @@ object Strings {
     var ABOUT_ME: String = ""
     var CAPACITY: String = ""
     var CAPACITY_AVAILABLE: String = ""
+    var CAPACITY_INTERNAL_FREE: String = ""
+    var CAPACITY_SDCARD_FREE: String = ""
     var VERSION: String = ""
     var SN: String = ""
     var MODEL: String = ""
@@ -118,6 +120,8 @@ object Strings {
             ABOUT = getString(R.string.about)
             CAPACITY = getString(R.string.capacity)
             CAPACITY_AVAILABLE = getString(R.string.capacity_available)
+            CAPACITY_INTERNAL_FREE = getString(R.string.internal_free)
+            CAPACITY_SDCARD_FREE = getString(R.string.sdcard_free)
             VERSION = getString(R.string.version)
             SN = getString(R.string.sn)
             MODEL = getString(R.string.model)

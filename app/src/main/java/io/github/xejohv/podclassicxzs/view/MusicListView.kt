@@ -264,7 +264,7 @@ class MusicListView : FrameLayout, ScreenView {
     
     private fun createSongItem(index: Int, music: Music, showInfo: Boolean): RecyclerListView.Item {
         // 只显示歌曲标题，符合iPod风格
-        val displayText = music.title
+        val displayText = displayTitle(music)
         // 创建Item，设置右侧文本为歌曲时长，并设置enable为true
         val item = RecyclerListView.Item(displayText, null, formatDuration(music.duration.toInt()))
         item.enable = true
@@ -309,11 +309,37 @@ class MusicListView : FrameLayout, ScreenView {
         return enter(currentIndex)
     }
 
+    /**
+     * 长按中央键 = 收藏 / 取消收藏当前这首。
+     * 曲目列表里收藏后会顶一个 ★；在「收藏的歌曲」里取消，这条会直接从列表消失。
+     */
     override fun enterLongClick(): Boolean {
-        // 注意：由于index是protected的，我们不能直接访问
-        // 这里使用一个简单的实现，假设当前选中的是第一个项目
-        // 实际上，这个方法应该由ListView的长按监听器调用
-        return false
+        val idx = listView.getCurrentIndex()
+        if (idx !in musicList.indices) {
+            return false
+        }
+        val music = musicList[idx]
+        val favourite = MusicTable.favourite
+        val wasFavourite = favourite.contains(music)
+        if (wasFavourite) {
+            favourite.remove(music)
+        } else {
+            favourite.add(music)
+        }
+        listView.shake()
+        if (type == TYPE_FAVOURITE && wasFavourite) {
+            musicList.removeAt(idx)
+            listView.removeCurrentItem()
+        } else {
+            listView.getItem(idx).name = displayTitle(music)
+            listView.refreshList()
+        }
+        return true
+    }
+
+    /** 收藏过的曲目在标题前顶一个 ★，一眼能看出收藏状态 */
+    private fun displayTitle(music: Music): String {
+        return if (MusicTable.favourite.contains(music)) "★ " + music.title else music.title
     }
 
     override fun slide(slideVal: Int): Boolean {

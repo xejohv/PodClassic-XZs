@@ -75,6 +75,8 @@
     <string name="about_me">关于</string>
     <string name="internal_storage">内部存储</string>
     <string name="sdcard">SD卡</string>
+    <string name="internal_free">内部可用</string>
+    <string name="sdcard_free">SD卡可用</string>
     <string name="theme_white">白色</string>
     <string name="volume_up">+</string>
     <string name="volume_down">-</string>

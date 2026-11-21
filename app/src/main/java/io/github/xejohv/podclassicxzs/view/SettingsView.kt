@@ -60,6 +60,21 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
         return Strings.SETTINGS
     }
 
+    /**
+     * 插了 SD 卡时，在"容量/可用容量"合计下面补上内置与卡各自的数字。
+     * 没插卡就返回空数组，列表跟以前完全一样。
+     */
+    private fun storageDetailItems(): Array<RecyclerListView.Item> {
+        val internal = StorageUtil.internal() ?: return emptyArray()
+        val sd = StorageUtil.external() ?: return emptyArray()
+        return arrayOf(
+            Item(Strings.INTERNAL_STORAGE, null, StorageUtil.format(internal.first)),
+            Item(Strings.CAPACITY_INTERNAL_FREE, null, StorageUtil.format(internal.second)),
+            Item(Strings.SDCARD, null, StorageUtil.format(sd.first)),
+            Item(Strings.CAPACITY_SDCARD_FREE, null, StorageUtil.format(sd.second))
+        )
+    }
+
     init {
         itemList = arrayListOf(
             Item(Strings.ABOUT, object : OnItemClickListener {
@@ -73,6 +88,7 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                                 Item(Strings.PHOTO, null, MediaStoreUtil.getPhotoSize().toString()),
                                 Item(Strings.CAPACITY, null, StorageUtil.totalText()),
                                 Item(Strings.CAPACITY_AVAILABLE, null, StorageUtil.freeText()),
+                                *storageDetailItems(),
                                 Item(Strings.VERSION, object : OnItemClickListener {
                                     var count = 0
                                     var lastClickMs = 0L
