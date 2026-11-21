@@ -372,7 +372,7 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
         private fun inScrubBand(x: Float, y: Float): Boolean {
             if (width <= 0 || height <= 0) return false
             if (y < height - dp(64f) || y > height - dp(6f)) return false
-            if (x < dp(14f) || x > width - dp(64f)) return false
+            if (x < dp(14f) || x > width - dp(72f)) return false
             return true
         }
 
