@@ -86,6 +86,7 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 
 **完整部署手册（含恢复出厂后 25 分钟重建清单、验收表、排障）：[docs/DEPLOY.md](./docs/DEPLOY.md)**
 **交给 AI 一键部署的提示词：[docs/AI-DEPLOY.md](./docs/AI-DEPLOY.md)**
+**版本变化（自 v1.5.21 起）：[docs/CHANGELOG.md](./docs/CHANGELOG.md)**
 
 三步概要（细节看手册）：
 
