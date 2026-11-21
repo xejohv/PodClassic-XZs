@@ -247,8 +247,8 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
     }
 
     override fun enterLongClick(): Boolean {
-        MediaPresenter.nextPlayMode()
-        return true
+        // 播放模式的入口已经挪到"长按播放键"（转盘底部播放/暂停区），这里不再接管长按
+        return false
     }
 
     fun setSeekBar(seekBar: SeekBar) {

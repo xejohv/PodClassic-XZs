@@ -22,6 +22,7 @@ import io.github.xejohv.podclassicxzs.values.Colors
 import io.github.xejohv.podclassicxzs.values.Strings
 import io.github.xejohv.podclassicxzs.values.Values
 import io.github.xejohv.podclassicxzs.view.MusicPlayerView
+import io.github.xejohv.podclassicxzs.view.PlayModeView
 import io.github.xejohv.podclassicxzs.widget.Screen
 import io.github.xejohv.podclassicxzs.widget.SlideController
 import io.github.xejohv.podclassicxzs.widget.SlideController3rd
@@ -110,6 +111,10 @@ object Core {
                         return true
                     }
 
+                    override fun onPauseLongClick(): Boolean {
+                        return openPlayModeMenu()
+                    }
+
                     override fun onPrevClick(): Boolean {
                         MediaPresenter.prev()
                         return true
@@ -161,6 +166,10 @@ object Core {
                         return true
                     }
 
+                    override fun onPauseLongClick(): Boolean {
+                        return openPlayModeMenu()
+                    }
+
                     override fun onPrevClick(): Boolean {
                         MediaPresenter.prev()
                         return true
@@ -172,6 +181,20 @@ object Core {
                 }
             }
         }
+    }
+
+    /**
+     * 长按转盘底部的播放/暂停区 = 打开「播放模式」菜单。
+     * 菜单两行分别控制播放顺序（顺序 / 随机 / 单曲循环）与全部循环，点一下切换。
+     * 长按期间回调每 600ms 触发一次，菜单已经开着就不再重复叠页。
+     */
+    private fun openPlayModeMenu(): Boolean {
+        if (getView() is PlayModeView) {
+            return true
+        }
+        val ctx = activity ?: return false
+        addView(PlayModeView(ctx))
+        return true
     }
 
     var lock = false

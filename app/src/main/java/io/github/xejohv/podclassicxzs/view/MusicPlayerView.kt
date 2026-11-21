@@ -236,9 +236,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     }
 
     override fun enterLongClick(): Boolean {
-        // 长按 MENU：打开「播放模式」菜单（播放顺序 / 全部循环），不再偷偷切换
-        Core.addView(PlayModeView(context))
-        return true
+        // 播放模式的入口已经挪到"长按播放键"（转盘底部播放/暂停区），这里不再接管长按
+        return false
     }
 
     /** 点了右上角图标后，短暂在标题栏左侧显示当前模式，避免"点了不知道变成了什么" */
