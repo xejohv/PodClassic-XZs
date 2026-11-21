@@ -14,6 +14,7 @@ import io.github.xejohv.podclassicxzs.service.MediaService
 import io.github.xejohv.podclassicxzs.storage.MusicListTable
 import io.github.xejohv.podclassicxzs.storage.MusicTable
 import io.github.xejohv.podclassicxzs.storage.SPManager
+import io.github.xejohv.podclassicxzs.util.LocaleHelper
 import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
 import io.github.xejohv.podclassicxzs.util.ThreadUtil
 import io.github.xejohv.podclassicxzs.util.VolumeUtil
@@ -272,17 +273,10 @@ object Core {
     }
 
     fun setLanguage() {
-        val context = BaseApplication.context
-        val resources = context.resources
-        val configuration: Configuration = resources.configuration
-
-        when (SPManager.getInt(SPManager.Language.SP_NAME)) {
-            SPManager.Language.CN.id -> configuration.setLocale(Locale.SIMPLIFIED_CHINESE)
-            SPManager.Language.TW.id -> configuration.setLocale(Locale.TRADITIONAL_CHINESE)
-            SPManager.Language.EN.id -> configuration.setLocale(Locale.US)
-            SPManager.Language.AUTO.id -> configuration.setLocale(Locale.getDefault())
-        }
-        context.createConfigurationContext(configuration)
+        // 之前这里把 createConfigurationContext() 的返回值丢了，等于什么都没配，
+        // 所以语言选项点了也不生效。现在直接把 locale 落到应用上下文的 resources 上，
+        // Activity 那层由 attachBaseContext() 负责（见 LocaleHelper）
+        LocaleHelper.applyTo(BaseApplication.context)
         Strings.init()
     }
 

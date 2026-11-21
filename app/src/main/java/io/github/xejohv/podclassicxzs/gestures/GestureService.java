@@ -368,6 +368,7 @@ public class GestureService extends AccessibilityService {
                     params(dp(128), dp(6), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL, false);
             pillParams.y = dp(7);
             wm.addView(pill, pillParams);
+            pill.setVisibility(pillRequestedVisible ? View.VISIBLE : View.GONE);
 
             // 顶部拦截条：任何界面从顶部下滑都不会拉出状态栏
             topStrip = new View(this);
@@ -457,6 +458,37 @@ public class GestureService extends AccessibilityService {
         }
         pendingExitBar = 0;
         s.showExitBarInternal(raised);
+    }
+
+    /**
+     * 底部那条"home indicator"细横线（pill）的显隐。
+     * 全屏看视频时它既不能点、又占着画面下沿，直接收掉。
+     */
+    public static void setPillVisible(boolean visible) {
+        pillRequestedVisible = visible;
+        GestureService s = instance;
+        if (s == null) {
+            return;
+        }
+        s.setPillVisibleInternal(visible);
+    }
+
+    /** 服务没连上时先记下目标状态，install() 建好 pill 后按它来 */
+    private static boolean pillRequestedVisible = true;
+
+    private void setPillVisibleInternal(final boolean visible) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (pill == null) {
+                    return;
+                }
+                try {
+                    pill.setVisibility(visible ? View.VISIBLE : View.GONE);
+                } catch (Throwable ignored) {
+                }
+            }
+        });
     }
 
     /** 收起悬浮控制器 */

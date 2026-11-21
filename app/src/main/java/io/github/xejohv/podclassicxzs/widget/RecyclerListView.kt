@@ -287,7 +287,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 val viewHolder = recyclerView.getChildViewHolder(recyclerView.getChildAt(i))
                 if (viewHolder is ItemViewHolder) {
                     val itemIndex = position + i
-                    viewHolder.setHighlight(itemIndex == index)
+                    viewHolder.setHighlight(highlightEnabled && itemIndex == index)
                 }
             }
         }
@@ -435,6 +435,13 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     private var position = 0
 
     var sorted = false
+
+    /**
+     * 是否画"选中条"。
+     * 「关于本机」这类只读信息页没有可进入的条目，选中条本身没有意义，
+     * 关掉以后整页就是干净的标签+数值，不会出现好几行同时像被选中。
+     */
+    var highlightEnabled = true
     private var prevSlideTime = 0L
     private var slideCount = 0
 
@@ -559,7 +566,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 val item = itemList[actualIndex]
                 // 判断是否显示滚动条（item 数量大于 MAX_SIZE 时显示）
                 val showScrollBar = itemList.size > MAX_SIZE
-                holder.bind(item, actualIndex == index, item.enable, item.rightText, showScrollBar)
+                holder.bind(item, highlightEnabled && actualIndex == index, item.enable, item.rightText, showScrollBar)
                 // 设置 item 的点击监听
                 onItemCreated(actualIndex, holder.itemView as ItemView)
             }
@@ -766,6 +773,11 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
         fun setHighlight(highlight: Boolean) {
             if (this.highlight == highlight) {
+                // 状态没变也把背景再确认一次：RecyclerView 复用 item 时，
+                // 上一次残留的深色选中条会被带到新行上（「关于本机」整页都变深条就是这个原因）
+                if (!highlight && background != null) {
+                    background = null
+                }
                 return
             }
             this.highlight = highlight

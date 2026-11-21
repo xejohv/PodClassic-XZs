@@ -139,6 +139,8 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
         landscape = true
         Core.setGameExpanded(true)
         GestureService.hideExitBar()
+        // 全屏看片时连系统那条底部细横线也一起收掉：它本来就不能点，留着只会让人以为坏了
+        GestureService.setPillVisible(false)
         activityOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
         overlay.hideControlsNow()
         postDelayed({ fitVideo() }, 320)
@@ -149,6 +151,7 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
     fun exitFullscreen() {
         landscape = false
         Core.setGameExpanded(false)
+        GestureService.setPillVisible(true)
         activityOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         overlay.hideControlsNow()
         postDelayed({ fitVideo() }, 320)
@@ -161,6 +164,7 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
         Core.setGameExpanded(false)
         // 视频页不挂悬浮退出条（返回键在画面左上角，长按左上角也能直接退）
         GestureService.hideExitBar()
+        GestureService.setPillVisible(true)
         handler.removeCallbacks(ticker)
         handler.postDelayed(ticker, 500)
         overlay.resetHint()
@@ -206,6 +210,8 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
 
     override fun onViewDelete() {
         handler.removeCallbacks(ticker)
+        // 视频页走了，把全局底部横线还回去
+        GestureService.setPillVisible(true)
         // 退出视频必须把屏幕转回竖屏，否则整个 App 会横着留在桌面上
         if (landscape) {
             landscape = false
@@ -253,6 +259,16 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
          * 浮出后 3.2 秒没动静自动再收起，再轻触又出来。
          */
         private var controlsVisible = false
+
+        /**
+         * 底部进度条拖动快进/快退：
+         * 按下即暂停并进入 scrub，只更新画面上的进度与气泡，松手才真正 seekTo，
+         * 这样在 XZs 上拖起来不会一顿一顿地卡。
+         */
+        private var scrubbing = false
+        private var scrubPos = 0
+        private var scrubDuration = 0
+        private var resumeAfterScrub = false
         private val hideControls = Runnable {
             controlsVisible = false
             invalidate()
@@ -291,7 +307,8 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
                 canvas.drawRect(0f, 0f, w, dp(52f), p)
                 canvas.drawRect(0f, h - dp(46f), w, h, p)
 
-                drawBack(canvas)
+                // 全屏时不再画左上返回键：切换只留右下角那个全屏/收回键
+                if (!landscape) drawBack(canvas)
                 drawFullscreen(canvas, w, h)
                 drawProgress(canvas, w, h)
                 drawPlayIcon(canvas, w, h)
@@ -345,6 +362,71 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
             p.style = Paint.Style.FILL
         }
 
+        private fun barLeft() = dp(20f)
+
+        private fun barRight() = width - dp(20f)
+
+        private fun barY() = height - dp(30f)
+
+        /** 进度条命中带：只在画面最下面一条，右下角全屏键那块让给全屏键 */
+        private fun inScrubBand(x: Float, y: Float): Boolean {
+            if (width <= 0 || height <= 0) return false
+            if (y < height - dp(64f) || y > height - dp(6f)) return false
+            if (x < dp(14f) || x > width - dp(64f)) return false
+            return true
+        }
+
+        private fun beginScrub(): Boolean {
+            scrubDuration = try {
+                videoView.duration
+            } catch (e: Exception) {
+                0
+            }
+            if (scrubDuration <= 0) return false
+            scrubbing = true
+            resumeAfterScrub = try {
+                videoView.isPlaying
+            } catch (e: Exception) {
+                false
+            }
+            if (resumeAfterScrub) {
+                try {
+                    videoView.pause()
+                } catch (e: Exception) {
+                }
+            }
+            handler.removeCallbacks(hideControls)
+            controlsVisible = true
+            invalidate()
+            return true
+        }
+
+        private fun updateScrub(x: Float) {
+            if (!scrubbing) return
+            val l = barLeft()
+            val r = barRight()
+            val ratio = ((x - l) / (r - l)).coerceIn(0f, 1f)
+            scrubPos = (ratio * scrubDuration).toInt()
+            invalidate()
+        }
+
+        private fun finishScrub() {
+            val target = scrubPos
+            scrubbing = false
+            try {
+                videoView.seekTo(target)
+            } catch (e: Exception) {
+            }
+            if (resumeAfterScrub) {
+                try {
+                    videoView.start()
+                } catch (e: Exception) {
+                }
+            }
+            resumeAfterScrub = false
+            showControls(true)
+        }
+
         private fun drawHint(canvas: Canvas, w: Float) {
             if (System.currentTimeMillis() > hintUntil) return
             p.style = Paint.Style.FILL
@@ -352,41 +434,70 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
             p.textAlign = Paint.Align.CENTER
             p.textSize = dp(12f)
             val text = if (landscape) {
-                "轻触画面 显示控件 · 左右边缘内滑 返回半屏"
+                "轻触画面 显示控件 · 底部进度条左右拖动快进 · 右下角收回半屏"
             } else {
-                "轻触画面 显示控件 · 右下角 全屏"
+                "轻触画面 显示控件 · 底部进度条左右拖动快进 · 右下角 全屏"
             }
             canvas.drawText(text, w / 2f, dp(86f), p)
         }
 
         private fun drawProgress(canvas: Canvas, w: Float, h: Float) {
-            val duration = try {
+            val duration = if (scrubbing) scrubDuration else try {
                 videoView.duration
             } catch (e: Exception) {
                 0
             }
             if (duration <= 0) return
-            val pos = try {
+            val pos = if (scrubbing) scrubPos else try {
                 videoView.currentPosition
             } catch (e: Exception) {
                 0
             }
-            val l = dp(20f)
-            val r = w - dp(20f)
-            val y = h - dp(30f)
+            val l = barLeft()
+            val r = barRight()
+            val y = barY()
             p.style = Paint.Style.FILL
             p.color = Color.argb(110, 255, 255, 255)
             canvas.drawRoundRect(RectF(l, y, r, y + dp(3f)), dp(2f), dp(2f), p)
-            val ratio = pos.toFloat() / duration.toFloat()
+            val ratio = (pos.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+            val dotX = l + (r - l) * ratio
             p.color = Color.WHITE
-            canvas.drawRoundRect(RectF(l, y, l + (r - l) * ratio, y + dp(3f)), dp(2f), dp(2f), p)
+            canvas.drawRoundRect(RectF(l, y, dotX, y + dp(3f)), dp(2f), dp(2f), p)
+
+            // 进度条端头的圆点：明确告诉用户这条能拖
+            if (scrubbing) {
+                p.color = Color.argb(70, 0, 0, 0)
+                canvas.drawCircle(dotX, y + dp(1.5f), dp(13f), p)
+                p.color = Color.WHITE
+                canvas.drawCircle(dotX, y + dp(1.5f), dp(6.5f), p)
+            } else {
+                p.color = Color.WHITE
+                canvas.drawCircle(dotX, y + dp(1.5f), dp(6f), p)
+            }
 
             p.textSize = dp(12f)
             p.color = Color.argb(220, 255, 255, 255)
             p.textAlign = Paint.Align.LEFT
-            canvas.drawText(timeText(pos), l, y - dp(6f), p)
+            canvas.drawText(timeText(pos), l, y - dp(8f), p)
             p.textAlign = Paint.Align.RIGHT
-            canvas.drawText(timeText(duration), r, y - dp(6f), p)
+            canvas.drawText(timeText(duration), r, y - dp(8f), p)
+
+            // 拖动时在圆点上方浮一个时间气泡，手指压住进度条也看得见目标时间
+            if (scrubbing) {
+                val label = timeText(scrubPos)
+                p.textSize = dp(13f)
+                val tw = p.measureText(label)
+                val bw = tw + dp(18f)
+                val bh = dp(24f)
+                val bx = (dotX - bw / 2f).coerceIn(dp(4f), w - dp(4f) - bw)
+                val by = y - dp(32f)
+                p.color = Color.argb(170, 0, 0, 0)
+                canvas.drawRoundRect(RectF(bx, by, bx + bw, by + bh), dp(6f), dp(6f), p)
+                p.color = Color.WHITE
+                p.textAlign = Paint.Align.CENTER
+                canvas.drawText(label, bx + bw / 2f, by + bh * 0.68f, p)
+                p.textAlign = Paint.Align.LEFT
+            }
         }
 
         private fun drawPlayIcon(canvas: Canvas, w: Float, h: Float) {
@@ -425,18 +536,31 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
                     downY = event.y
                     downTime = System.currentTimeMillis()
                     longPressed = false
-                    if (event.x < dp(80f) && event.y < dp(80f)) {
+                    // 底部进度条：按住就能拖，不必先轻触唤出控件
+                    if (inScrubBand(event.x, event.y) && beginScrub()) {
+                        updateScrub(event.x)
+                        return true
+                    }
+                    if (!landscape && event.x < dp(80f) && event.y < dp(80f)) {
                         postDelayed(longPressRunnable, 600)
                     }
                     return true
                 }
                 MotionEvent.ACTION_MOVE -> {
+                    if (scrubbing) {
+                        updateScrub(event.x)
+                        return true
+                    }
                     if (!longPressed && abs(event.y - downY) > dp(28f)) {
                         removeCallbacks(longPressRunnable)
                     }
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
+                    if (scrubbing) {
+                        finishScrub()
+                        return true
+                    }
                     removeCallbacks(longPressRunnable)
                     if (longPressed) {
                         longPressed = false
@@ -469,7 +593,8 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
                         return true
                     }
 
-                    if (controlsVisible && event.x < dp(60f) && event.y < dp(60f)) {
+                    // 全屏时不再留左上返回键的位置，只靠右下角全屏键收回半屏
+                    if (!landscape && controlsVisible && event.x < dp(60f) && event.y < dp(60f)) {
                         Core.removeView()
                         return true
                     }

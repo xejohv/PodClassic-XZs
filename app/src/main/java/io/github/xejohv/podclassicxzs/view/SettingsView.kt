@@ -15,6 +15,7 @@ import io.github.xejohv.podclassicxzs.media.PlayMode
 import io.github.xejohv.podclassicxzs.media.RepeatMode
 import io.github.xejohv.podclassicxzs.service.MediaPresenter
 import io.github.xejohv.podclassicxzs.storage.SPManager
+import io.github.xejohv.podclassicxzs.util.LocaleHelper
 import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
 import io.github.xejohv.podclassicxzs.values.Colors
 import io.github.xejohv.podclassicxzs.values.Strings
@@ -27,6 +28,21 @@ import java.util.*
 class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
     companion object {
         const val about = "感谢您的使用!\n这里本应有个彩蛋, 但是没啥想法, 就这样吧.\n"
+    }
+
+    /**
+     * 「关于本机」这种只读信息页：一行就是「标签 + 数值」，没有能进去的下一级，
+     * 所以不画选中条、也不跟着游标走，整页保持干净的列表样式。
+     * （版本号那一行仍然可以被点，连点 6 次照样触发彩蛋）
+     */
+    private class InfoListView(
+        context: Context,
+        list: ArrayList<RecyclerListView.Item>,
+        title: String
+    ) : ItemListView(context, list, title, null) {
+        init {
+            highlightEnabled = false
+        }
     }
 
     override fun enter(): Boolean {
@@ -52,7 +68,7 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                     val statFs = StatFs(Environment.getDataDirectory().path)
                     val blockSizeLong = statFs.blockSizeLong
                     Core.addView(
-                        ItemListView(
+                        InfoListView(
                             context, arrayListOf(
                                 Item(Strings.iPod, null, false),
                                 Item(Strings.SONG, null, MediaStoreUtil.getMusicSize().toString()),
@@ -125,7 +141,7 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                                 ),//android.os.Build.SERIAL),
                                 Item(Strings.MODEL, null, "MA446ZP"),
                                 Item(Strings.FORMAT, null, "Windows")
-                            ), Strings.ABOUT, null
+                            ), Strings.ABOUT
                         )
                     )
                     return true
@@ -166,7 +182,10 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                             object : OnItemClickListener {
                                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                                     SPManager.setInt(SPManager.Language.SP_NAME, index)
-                                    //Toast.makeText(context, "set language", Toast.LENGTH_SHORT).show()
+                                    // 先把语言真正落到 resources 上（之前只算了 configuration 没应用，所以永远无效），
+                                    // 再重启进程让整机界面用新语言重新构建
+                                    LocaleHelper.applyTo(io.github.xejohv.podclassicxzs.base.BaseApplication.context)
+                                    Strings.init()
                                     Core.reboot()
                                     return true
                                 }

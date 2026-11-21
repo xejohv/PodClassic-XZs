@@ -27,6 +27,7 @@ import io.github.xejohv.podclassicxzs.service.MediaPresenter
 import io.github.xejohv.podclassicxzs.service.MediaService
 import io.github.xejohv.podclassicxzs.service.PodDeviceAdminReceiver
 import io.github.xejohv.podclassicxzs.storage.SPManager
+import io.github.xejohv.podclassicxzs.util.LocaleHelper
 import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
 import io.github.xejohv.podclassicxzs.util.ThreadUtil
 import io.github.xejohv.podclassicxzs.values.Values
@@ -69,6 +70,11 @@ class MainActivity : AppCompatActivity() {
             } catch (ignored: Exception) {
             }
         }
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        // Activity 也套上目标语言，否则切换语言后整个界面仍是系统语言
+        super.attachBaseContext(LocaleHelper.wrap(newBase))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
