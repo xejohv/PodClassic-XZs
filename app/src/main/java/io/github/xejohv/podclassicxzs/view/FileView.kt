@@ -146,7 +146,13 @@ class FileView(context: Context, val roots: List<File>, private val rootTitle: S
         } else if (FileUtil.isAudio(file)) {
             val music = MediaStoreUtil.getMusicFromFile(file.path)
             if (music != null) {
-                MusicTable.favourite.add(music)
+                // 长按统一是收藏 / 取消收藏，不重复往收藏里塞同一条
+                val favourite = MusicTable.favourite
+                if (favourite.contains(music)) {
+                    favourite.remove(music)
+                } else {
+                    favourite.add(music)
+                }
                 shake()
                 return true
             }

@@ -18,6 +18,7 @@ import io.github.xejohv.podclassicxzs.bean.Music
 import io.github.xejohv.podclassicxzs.media.PlayMode
 import io.github.xejohv.podclassicxzs.media.RepeatMode
 import io.github.xejohv.podclassicxzs.service.MediaPresenter
+import io.github.xejohv.podclassicxzs.storage.MusicTable
 import io.github.xejohv.podclassicxzs.storage.SPManager
 import io.github.xejohv.podclassicxzs.util.LiveData
 import io.github.xejohv.podclassicxzs.util.ThreadUtil
@@ -235,9 +236,21 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         return true
     }
 
+    /**
+     * 长按中央键 = 收藏 / 取消收藏正在播放的这首（气泡提示）。
+     * 全应用统一：列表里长按收藏选中项，播放页长按收藏当前曲，播放模式只从右上角图标切。
+     */
     override fun enterLongClick(): Boolean {
-        // 播放模式的入口已经挪到"长按播放键"（转盘底部播放/暂停区），这里不再接管长按
-        return false
+        val music = MediaPresenter.getCurrent() ?: return false
+        val favourite = MusicTable.favourite
+        val nowFavourite = !favourite.contains(music)
+        if (nowFavourite) {
+            favourite.add(music)
+        } else {
+            favourite.remove(music)
+        }
+        showModeBubble(if (nowFavourite) "已收藏" else "已取消收藏")
+        return true
     }
 
     /** 点了右上角图标后，短暂在标题栏左侧显示当前模式，避免"点了不知道变成了什么" */

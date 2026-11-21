@@ -22,6 +22,7 @@ import io.github.xejohv.podclassicxzs.bean.Music
 import io.github.xejohv.podclassicxzs.media.PlayMode
 import io.github.xejohv.podclassicxzs.media.RepeatMode
 import io.github.xejohv.podclassicxzs.service.MediaPresenter
+import io.github.xejohv.podclassicxzs.storage.MusicTable
 import io.github.xejohv.podclassicxzs.storage.SPManager
 import io.github.xejohv.podclassicxzs.util.LiveData
 import io.github.xejohv.podclassicxzs.util.ThreadUtil
@@ -246,9 +247,16 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
         return true
     }
 
+    /** 长按中央键 = 收藏 / 取消收藏正在播放的这首（统一手势，播放模式只从图标切） */
     override fun enterLongClick(): Boolean {
-        // 播放模式的入口已经挪到"长按播放键"（转盘底部播放/暂停区），这里不再接管长按
-        return false
+        val music = MediaPresenter.getCurrent() ?: return false
+        val favourite = MusicTable.favourite
+        if (favourite.contains(music)) {
+            favourite.remove(music)
+        } else {
+            favourite.add(music)
+        }
+        return true
     }
 
     fun setSeekBar(seekBar: SeekBar) {
