@@ -3,8 +3,6 @@ package io.github.xejohv.podclassicxzs.view
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.os.Environment
-import android.os.StatFs
 import android.provider.Settings
 import android.util.Base64
 import io.github.xejohv.podclassicxzs.activity.MainActivity
@@ -17,6 +15,7 @@ import io.github.xejohv.podclassicxzs.service.MediaPresenter
 import io.github.xejohv.podclassicxzs.storage.SPManager
 import io.github.xejohv.podclassicxzs.util.LocaleHelper
 import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
+import io.github.xejohv.podclassicxzs.util.StorageUtil
 import io.github.xejohv.podclassicxzs.values.Colors
 import io.github.xejohv.podclassicxzs.values.Strings
 import io.github.xejohv.podclassicxzs.values.Values
@@ -65,25 +64,15 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
         itemList = arrayListOf(
             Item(Strings.ABOUT, object : OnItemClickListener {
                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    val statFs = StatFs(Environment.getDataDirectory().path)
-                    val blockSizeLong = statFs.blockSizeLong
                     Core.addView(
                         InfoListView(
                             context, arrayListOf(
                                 Item(Strings.iPod, null, false),
-                                Item(Strings.SONG, null, MediaStoreUtil.getMusicSize().toString()),
+                                Item(Strings.SONG, null, MediaStoreUtil.getMusicList().size.toString()),
                                 Item(Strings.VIDEO, null, MediaStoreUtil.getVideoSize().toString()),
                                 Item(Strings.PHOTO, null, MediaStoreUtil.getPhotoSize().toString()),
-                                Item(
-                                    Strings.CAPACITY,
-                                    null,
-                                    (blockSizeLong * statFs.blockCountLong / 1024 / 1024 / 1024).toString() + " GB"
-                                ),
-                                Item(
-                                    Strings.CAPACITY_AVAILABLE,
-                                    null,
-                                    (blockSizeLong * statFs.availableBlocksLong / 1024 / 1024 / 1024).toString() + " GB"
-                                ),
+                                Item(Strings.CAPACITY, null, StorageUtil.totalText()),
+                                Item(Strings.CAPACITY_AVAILABLE, null, StorageUtil.freeText()),
                                 Item(Strings.VERSION, object : OnItemClickListener {
                                     var count = 0
                                     var lastClickMs = 0L
