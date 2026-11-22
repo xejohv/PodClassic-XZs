@@ -29,6 +29,7 @@ import io.github.xejohv.podclassicxzs.service.PodDeviceAdminReceiver
 import io.github.xejohv.podclassicxzs.storage.SPManager
 import io.github.xejohv.podclassicxzs.util.LocaleHelper
 import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
+import io.github.xejohv.podclassicxzs.util.BrightnessUtil
 import io.github.xejohv.podclassicxzs.util.ThreadUtil
 import io.github.xejohv.podclassicxzs.values.Values
 import io.github.xejohv.podclassicxzs.view.LockView
@@ -85,6 +86,8 @@ class MainActivity : AppCompatActivity() {
         }
         initScreen()
         setContentView(R.layout.activity_main)
+        // 恢复上次的屏幕亮度（自动档不覆盖系统亮度）
+        BrightnessUtil.apply(this)
         initView()
         if (!SPManager.getBoolean(SPManager.SP_STARTED)) {
             SPManager.setBoolean(SPManager.SP_STARTED, true)

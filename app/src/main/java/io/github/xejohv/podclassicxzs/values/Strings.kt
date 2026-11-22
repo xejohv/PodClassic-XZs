@@ -86,6 +86,8 @@ object Strings {
     var REPEAT_MODE_NONE: String = ""
     var REPEAT_MODE_ALL: String = ""
     var NIGHT_MODE: String = ""
+    var SCREEN_BRIGHTNESS: String = ""
+    var BRIGHTNESS_AUTO: String = ""
     var PLAY_WITH_OTHER: String = ""
     var TOUCH_FEEDBACK: String = ""
     var VIBRATE: String = ""
@@ -197,6 +199,8 @@ object Strings {
             REPEAT_MODE_NONE = getString(R.string.repeat_mode_none)
             REPEAT_MODE_ALL = getString(R.string.repeat_mode_all)
             NIGHT_MODE = getString(R.string.night_mode)
+            SCREEN_BRIGHTNESS = getString(R.string.screen_brightness)
+            BRIGHTNESS_AUTO = getString(R.string.brightness_auto)
             PLAY_WITH_OTHER = getString(R.string.play_with_other)
             TOUCH_FEEDBACK = getString(R.string.touch_feedback)
             VIBRATE = getString(R.string.vibrate)

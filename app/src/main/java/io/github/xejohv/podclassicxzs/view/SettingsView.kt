@@ -15,6 +15,7 @@ import io.github.xejohv.podclassicxzs.service.MediaPresenter
 import io.github.xejohv.podclassicxzs.storage.SPManager
 import io.github.xejohv.podclassicxzs.util.LocaleHelper
 import io.github.xejohv.podclassicxzs.util.MediaStoreUtil
+import io.github.xejohv.podclassicxzs.util.BrightnessUtil
 import io.github.xejohv.podclassicxzs.util.StorageUtil
 import io.github.xejohv.podclassicxzs.values.Colors
 import io.github.xejohv.podclassicxzs.values.Strings
@@ -761,6 +762,20 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
                                     SPManager.Sound.SP_NAME
                                 )
                             )
+                        ),
+                        // 屏幕亮度：自动 → 20% → 40% → 60% → 80% → 100% → 自动
+                        Item(
+                            Strings.SCREEN_BRIGHTNESS, object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    val next = BrightnessUtil.next()
+                                    BrightnessUtil.set(next)
+                                    BrightnessUtil.apply(context)
+                                    listView.getCurrentItem().rightText =
+                                        BrightnessUtil.label(next, Strings.BRIGHTNESS_AUTO)
+                                    listView.refreshItem()
+                                    return true
+                                }
+                            }, BrightnessUtil.label(autoText = Strings.BRIGHTNESS_AUTO)
                         ),
     )
 

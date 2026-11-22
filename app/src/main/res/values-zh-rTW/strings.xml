@@ -56,6 +56,8 @@
     <string name="repeat_mode">重複播放</string>
     <string name="repeat_mode_all">重複全部</string>
     <string name="repeat_mode_none">不重複</string>
+    <string name="screen_brightness">螢幕亮度</string>
+    <string name="brightness_auto">自動</string>
     <string name="night_mode">夜間模式</string>
     <string name="play_with_other">與其它應用同時播放</string>
     <string name="touch_feedback">按鍵反饋</string>

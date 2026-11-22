@@ -56,6 +56,8 @@
     <string name="repeat_mode">Repeat</string>
     <string name="repeat_mode_all">Repeat All</string>
     <string name="repeat_mode_none">No Repeat</string>
+    <string name="screen_brightness">Screen Brightness</string>
+    <string name="brightness_auto">Auto</string>
     <string name="night_mode">Night Mode</string>
     <string name="play_with_other">Play With Other Apps</string>
     <string name="touch_feedback">Touch Feedback</string>
