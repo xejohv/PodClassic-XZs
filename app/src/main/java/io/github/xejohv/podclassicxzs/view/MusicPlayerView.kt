@@ -340,9 +340,37 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
      * 用 VolumeUtil.Watcher（ContentObserver + 轮询兜底），不再依赖不可靠的 VOLUME_CHANGED 广播。
      */
     private val volumeWatcher by lazy {
-        VolumeUtil.Watcher { v -> volumeBar.setCurrent(v) }
+        VolumeUtil.Watcher { v -> onHardwareVolumeChanged(v) }
     }
     private var volumeWatcherStarted = false
+
+    /**
+     * 硬件音量键 / 系统音量变化 → 屏幕上的音量条。
+     * 之前只改了 volumeBar 的数值，但当前显示的仍是进度条，所以按音量键"什么都没发生"。
+     * 这里按和转盘同一套逻辑处理：切到音量条、刷新格数，再用同一个 2 秒计时器回落进度条。
+     */
+    private fun onHardwareVolumeChanged(v: Int) {
+        if (seekMode) return
+        val max = VolumeUtil.maxVolume
+        volumeBar.textVisibility = View.GONE
+        volumeBar.setCurrent(v.coerceIn(0, max))
+        val onVolumeBar = screenLayout.curr() === volumeBar
+        if (!onVolumeBar) setSeekBar(volumeBar)
+
+        // 连续按键时不断重置计时，停手 2 秒才回到进度条
+        if (System.currentTimeMillis() - prevTimerSetTime >= 1000) {
+            prevTimerSetTime = System.currentTimeMillis()
+            timer?.cancel()
+            timer = Timer()
+            timer?.schedule(object : TimerTask() {
+                override fun run() {
+                    ThreadUtil.runOnUiThread {
+                        if (screenLayout.curr() === volumeBar) setSeekBar(progressBar)
+                    }
+                }
+            }, 2000)
+        }
+    }
 
     override fun onViewAdd() {
         Log.d("MusicPlayerView", "========== onViewAdd() started ==========")
