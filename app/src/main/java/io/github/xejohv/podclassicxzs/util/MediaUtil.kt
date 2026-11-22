@@ -47,14 +47,24 @@ object MediaUtil {
     }
 
     private fun getMusicImage(path: String): Bitmap? {
-        val mediaMetadataRetriever = MediaMetadataRetriever()
-        mediaMetadataRetriever.setDataSource(path)
-        val byteArray = mediaMetadataRetriever.embeddedPicture
-        mediaMetadataRetriever.release()
-        return if (byteArray == null || byteArray.isEmpty()) {
+        // 文件被删/被拔卡后 setDataSource 会抛 IllegalArgumentException，这里必须兜住，否则整机会闪退
+        var retriever: MediaMetadataRetriever? = null
+        return try {
+            retriever = MediaMetadataRetriever()
+            retriever.setDataSource(path)
+            val byteArray = retriever.embeddedPicture
+            if (byteArray == null || byteArray.isEmpty()) {
+                null
+            } else {
+                BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+            }
+        } catch (e: Exception) {
             null
-        } else {
-            return BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
+        } finally {
+            try {
+                retriever?.release()
+            } catch (_: Exception) {
+            }
         }
     }
 

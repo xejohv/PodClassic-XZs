@@ -173,6 +173,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 scrollable = true
                 typeface = Typeface.defaultFromStyle(Typeface.NORMAL)
                 textSize = 12f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
                 setPadding(0, 0, 0, 0)
                 gravity = Gravity.CENTER
             }
@@ -254,16 +256,19 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     }
 
     /** 点了右上角图标后，短暂在标题栏左侧显示当前模式，避免"点了不知道变成了什么" */
+    /**
+     * 点图标 / 长按收藏后的即时反馈。
+     *
+     * 原来把文字塞进标题栏的 tv_mode_bubble，实测在真机上根本看不到——标题栏那一行
+     * 正好被系统状态栏压着。改成顶部居中的 Toast：走系统窗口，不会被任何东西盖住。
+     */
     private fun showModeBubble(text: String) {
-        val b = bubble ?: return
-        b.text = text
-        b.visibility = View.VISIBLE
-        b.removeCallbacks(hideBubbleRunnable)
-        b.postDelayed(hideBubbleRunnable, 1600)
-    }
-
-    private val hideBubbleRunnable = Runnable {
-        bubble?.visibility = View.GONE
+        try {
+            val toast = android.widget.Toast.makeText(context, text, android.widget.Toast.LENGTH_SHORT)
+            toast.setGravity(android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL, 0, 150)
+            toast.show()
+        } catch (e: Exception) {
+        }
     }
 
     /** 点击后即将切换到的模式名（切换是异步落到服务里，所以按当前值推下一个） */
@@ -282,6 +287,11 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 screenLayout.remove()
             }
         }
+        // 音量模式下把两端的时间藏起来：iPod 的音量条只留喇叭图标和条身，
+        // 带着「03:05 / -01:10」会让人以为还是进度
+        val isVolume = seekBar === volumeBar
+        currentTime?.visibility = if (isVolume) View.INVISIBLE else View.VISIBLE
+        remainingTime?.visibility = if (isVolume) View.INVISIBLE else View.VISIBLE
     }
 
     private fun setStopTime() {
@@ -420,7 +430,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             progressBar.setCurrent(progress)
             // 拖动进度条时也更新时间显示
             currentTime.text = formatTime(progress)
-            remainingTime.text = "-" + formatTime(duration - progress)
+            remainingTime.text = if (duration <= 0) "--:--" else "-" + formatTime((duration - progress).coerceAtLeast(0))
             return true
         } else {
             val currentTime = System.currentTimeMillis()
@@ -567,7 +577,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 album.setPadding(0, 0, 0, 0)
                 index.gravity = Gravity.START
                 index.setPadding(0, 0, 0, 0)
-                lyric?.gravity = Gravity.START
+                lyric?.gravity = Gravity.CENTER
             } else {
                 Log.d("MusicPlayerView", "Bitmap is not null, setting to image view")
                 // 设置专辑封面
@@ -583,7 +593,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 album.setPadding(0, 0, 0, 0)
                 index.gravity = Gravity.START
                 index.setPadding(0, 0, 0, 0)
-                lyric?.gravity = Gravity.START
+                lyric?.gravity = Gravity.CENTER
                 
                 // 显示歌词区域（如果启用）
                 lyric?.visibility = if (lyric?.text.isNullOrEmpty()) GONE else VISIBLE
@@ -608,9 +618,15 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             // 只在非拖动模式下更新时间显示，保持拖动后的时间显示方便确认
             val duration = MediaPresenter.getDuration()
             currentTime.text = formatTime(progress)
-            remainingTime.text = "-" + formatTime(duration - progress)
+            remainingTime.text = if (duration <= 0) "--:--" else "-" + formatTime((duration - progress).coerceAtLeast(0))
         }
-        lyric?.setBufferedText(MediaPresenter.getCurrent()?.lyric?.getLyric(progress))
+        lyric?.let {
+            val line = MediaPresenter.getCurrent()?.lyric?.getLyric(progress)
+            it.setBufferedText(line)
+            // 逐秒刷新时一并决定可见性：封面回调那一刻还没有歌词文本，
+            // 早前只在那边设过一次 GONE，之后就再也亮不起来
+            it.visibility = if (line.isNullOrEmpty()) GONE else VISIBLE
+        }
     }
     
     // 格式化时间为 mm:ss 格式

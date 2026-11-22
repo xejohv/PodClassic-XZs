@@ -111,4 +111,23 @@
     <string name="dc_phase_preset_precise">Precise</string>
     <string name="dc_phase_preset_spatial">Spatial</string>
     <string name="dc_phase_preset_custom">Custom</string>
-</resources>
+    <string name="accessibility">Accessibility</string>
+    <string name="record">Record</string>
+    <string name="start_record">Start Recording</string>
+    <string name="stop_record">Stop Recording</string>
+    <string name="record_quality">Recording Quality</string>
+    <string name="quality_high">High</string>
+    <string name="quality_mid">Standard</string>
+    <string name="quality_low">Low</string>
+    <string name="delete_record">Delete Recording</string>
+    <string name="delete">Delete</string>
+    <string name="mic_permission">Microphone permission is required. Allow recording in system settings.</string>
+    <string name="record_empty">No recordings</string>
+    <string name="record_hint">Long press to delete</string>    <string name="group_play">Playback &amp; Display</string>
+    <string name="group_sound">Sound</string>
+    <string name="group_record">Recording</string>
+    <string name="group_look">Look &amp; Controls</string>
+    <string name="group_system">System</string>
+    <string name="sound_help">About Sound</string>
+    <string name="sound_help_text">System AGC: automatic gain — lifts quiet passages and tames loud ones, so quiet recordings are easier to hear.\n\nTomSteady: keeps overall volume steady across a track, so uneven recordings no longer jump between loud and soft.\n\nTube amp: emulates a valve amplifier, adding warm mids and slight distortion for a fuller vocal.\n\nDC phase linearizer: delays low / mid / high bands differently so bass and midrange line up again.\n\nEqualizer: preset tone shapes (rock, pop, classical...).\n\nAll of these process audio in real time and cost a little battery; leave them off if you cannot hear a difference.</string>
+    </resources>

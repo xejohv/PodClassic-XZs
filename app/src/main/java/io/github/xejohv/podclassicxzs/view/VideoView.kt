@@ -162,7 +162,7 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
         requestAudioFocus()
         // 进视频先给半屏：画面在上、红盘在下面，想看满屏再点右下角的全屏键
         Core.setGameExpanded(false)
-        // 视频页不挂悬浮退出条（返回键在画面左上角，长按左上角也能直接退）
+        // 视频页不挂悬浮退出条（退出靠 MENU）
         GestureService.hideExitBar()
         GestureService.setPillVisible(true)
         handler.removeCallbacks(ticker)
@@ -245,11 +245,6 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
         private var downX = 0f
         private var downY = 0f
         private var downTime = 0L
-        private var longPressed = false
-        private val longPressRunnable = Runnable {
-            longPressed = true
-            Core.home()
-        }
 
         private var hintUntil = 0L
 
@@ -307,28 +302,12 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
                 canvas.drawRect(0f, 0f, w, dp(52f), p)
                 canvas.drawRect(0f, h - dp(46f), w, h, p)
 
-                // 全屏时不再画左上返回键：切换只留右下角那个全屏/收回键
-                if (!landscape) drawBack(canvas)
+                // 画面里不再画任何返回键：半屏用 MENU 退出，全屏用右下角全屏键收回半屏
                 drawFullscreen(canvas, w, h)
                 drawProgress(canvas, w, h)
                 drawPlayIcon(canvas, w, h)
             }
             drawHint(canvas, w)
-        }
-
-        private fun drawBack(canvas: Canvas) {
-            val cx = dp(28f)
-            val cy = dp(28f)
-            p.style = Paint.Style.FILL
-            p.color = Color.argb(104, 0, 0, 0)
-            canvas.drawCircle(cx, cy, dp(17f), p)
-            p.color = Color.WHITE
-            path.reset()
-            path.moveTo(cx - dp(4.5f), cy)
-            path.lineTo(cx + dp(4.5f), cy - dp(7.5f))
-            path.lineTo(cx + dp(4.5f), cy + dp(7.5f))
-            path.close()
-            canvas.drawPath(path, p)
         }
 
         /** 右下角全屏键：四角向外 = 全屏；四角向内 = 收回半屏 */
@@ -434,9 +413,9 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
             p.textAlign = Paint.Align.CENTER
             p.textSize = dp(12f)
             val text = if (landscape) {
-                "轻触画面 显示控件 · 底部进度条左右拖动快进 · 右下角收回半屏"
+                "轻触画面 显示控件 · 底部进度条左右拖动快进 · 右下角 收回半屏"
             } else {
-                "轻触画面 显示控件 · 底部进度条左右拖动快进 · 右下角 全屏"
+                "轻触画面 显示控件 · 底部进度条左右拖动快进 · 右下角 全屏 · MENU 退出"
             }
             canvas.drawText(text, w / 2f, dp(86f), p)
         }
@@ -535,14 +514,10 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
                     downX = event.x
                     downY = event.y
                     downTime = System.currentTimeMillis()
-                    longPressed = false
                     // 底部进度条：按住就能拖，不必先轻触唤出控件
                     if (inScrubBand(event.x, event.y) && beginScrub()) {
                         updateScrub(event.x)
                         return true
-                    }
-                    if (!landscape && event.x < dp(80f) && event.y < dp(80f)) {
-                        postDelayed(longPressRunnable, 600)
                     }
                     return true
                 }
@@ -551,19 +526,11 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
                         updateScrub(event.x)
                         return true
                     }
-                    if (!longPressed && abs(event.y - downY) > dp(28f)) {
-                        removeCallbacks(longPressRunnable)
-                    }
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
                     if (scrubbing) {
                         finishScrub()
-                        return true
-                    }
-                    removeCallbacks(longPressRunnable)
-                    if (longPressed) {
-                        longPressed = false
                         return true
                     }
                     val dx = event.x - downX
@@ -593,11 +560,7 @@ class VideoView(context: Context, val file: File) : FrameLayout(context), Screen
                         return true
                     }
 
-                    // 全屏时不再留左上返回键的位置，只靠右下角全屏键收回半屏
-                    if (!landscape && controlsVisible && event.x < dp(60f) && event.y < dp(60f)) {
-                        Core.removeView()
-                        return true
-                    }
+                    // 画面里不放返回键：退出靠 MENU（半屏）/ 右下角全屏键收回半屏（全屏）
 
                     // 中央播放/暂停键（控件可见时才认）
                     val ccx = width / 2f

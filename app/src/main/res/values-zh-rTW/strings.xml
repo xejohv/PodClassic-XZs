@@ -111,4 +111,23 @@
     <string name="dc_phase_preset_precise">精確</string>
     <string name="dc_phase_preset_spatial">空間</string>
     <string name="dc_phase_preset_custom">自定義</string>
-</resources>
+    <string name="accessibility">輔助功能</string>
+    <string name="record">錄音</string>
+    <string name="start_record">開始錄音</string>
+    <string name="stop_record">結束錄音</string>
+    <string name="record_quality">錄音品質</string>
+    <string name="quality_high">高</string>
+    <string name="quality_mid">標準</string>
+    <string name="quality_low">低</string>
+    <string name="delete_record">刪除錄音</string>
+    <string name="delete">刪除</string>
+    <string name="mic_permission">需要麥克風權限，請在系統設定中允許本應用錄音</string>
+    <string name="record_empty">尚無錄音</string>
+    <string name="record_hint">長按可刪除錄音</string>    <string name="group_play">播放與顯示</string>
+    <string name="group_sound">音效</string>
+    <string name="group_record">錄音</string>
+    <string name="group_look">外觀與操作</string>
+    <string name="group_system">系統</string>
+    <string name="sound_help">音效說明</string>
+    <string name="sound_help_text">系統 AGC（自動增益）：聲音小時自動抬上來，環境吵時壓下去，小聲的錄音聽得更清楚。\n\nTomSteady（音量穩態）：把整首歌的音量鎖在同一水平，忽大忽小的錄音也會聽得平穩。\n\n膽機音效：模擬真空管功放，給聲音加一點溫暖的中頻和輕微失真，人聲更厚。\n\nDC 相位線性器：按低、中、高分頻點給各路聲音加不同延遲，讓低頻與中高頻重新對齊。\n\n等化器：預先調好的音色（搖滾、流行、古典等），整體改變聲音風格。\n\n這些都會即時處理音訊，開啟會多耗一點電；聽不出差別就保持關閉。</string>
+    </resources>

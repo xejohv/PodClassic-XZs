@@ -112,4 +112,23 @@
     <string name="dc_phase_preset_spatial">空间</string>
     <string name="dc_phase_preset_custom">自定义</string>
     <string name="gesture_service_desc">PodClassic 手势与状态栏管控（上滑回桌面、边缘内滑返回）</string>
-</resources>
+    <string name="accessibility">辅助功能</string>
+    <string name="record">录音</string>
+    <string name="start_record">开始录音</string>
+    <string name="stop_record">停止录音</string>
+    <string name="record_quality">录音质量</string>
+    <string name="quality_high">高</string>
+    <string name="quality_mid">标准</string>
+    <string name="quality_low">低</string>
+    <string name="delete_record">删除录音</string>
+    <string name="delete">删除</string>
+    <string name="mic_permission">需要麦克风权限，请在系统设置中允许本应用录音</string>
+    <string name="record_empty">暂无录音</string>
+    <string name="record_hint">长按可删除录音</string>    <string name="group_play">播放与显示</string>
+    <string name="group_sound">音效</string>
+    <string name="group_record">录音</string>
+    <string name="group_look">外观与操作</string>
+    <string name="group_system">系统</string>
+    <string name="sound_help">音效说明</string>
+    <string name="sound_help_text">系统 AGC（自动增益）：声音小的时候自动抬上来，环境吵的时候压下去，小声的录音听着更清楚。\n\nTomSteady（音量稳态）：把整首歌的音量锁在同一水平，忽大忽小的录音也会听着平稳，不会一会儿响一会儿轻。\n\n胆机音效：模拟电子管功放，给声音加一点温暖的中频和轻微失真，人声更厚。\n\nDC 相位线性器：按低、中、高分频点给各路声音加不同延迟，让低频与中高频重新对齐，鼓点和人声不会各走各的。\n\n均衡器：预先调好的音色（摇滚、流行、古典等），整体改变声音风格。\n\n这些都会实时处理音频，开着会多耗一点电；听不出差别就保持关闭。</string>
+    </resources>

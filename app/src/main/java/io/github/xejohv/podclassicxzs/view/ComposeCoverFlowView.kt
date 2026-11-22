@@ -149,6 +149,9 @@ class ComposeCoverFlowView(context: Context) : FrameLayout(context), ScreenView 
         isFocusable = true
     }
 
+    // Compose 子视图会吃掉 DOWN 事件，父层收不到 fling；统一在拦截层接管
+    override fun onInterceptTouchEvent(ev: MotionEvent): Boolean = true
+
     override fun enter(): Boolean {
         if (currentIndexState.intValue !in albums.indices) return false
 
@@ -295,11 +298,19 @@ private fun CoverFlowContent(
         val containerHeight = maxHeight
 
         val metrics = remember(containerWidth, containerHeight, density, configuration.orientation) {
-            val coverSize = 124.dp
-            val coverSizePx = with(density) { coverSize.toPx() }
             val screenWidthPx = with(density) { containerWidth.toPx() }
             val screenHeightPx = with(density) { containerHeight.toPx() }
-            val itemSpacing = coverSizePx * 0.72f
+
+            // 纵向按可用高度反推封面尺寸：封面占 1 份，倒影占 0.5 份，
+            // 底部再留出专辑名 + 歌手的一栏文字，保证整幅画面正好填满屏幕上半区，
+            // 不再出现「上面一大片空白、倒影又被裁掉半截」。
+            val topPadPx = with(density) { 10.dp.toPx() }
+            val textZonePx = with(density) { 66.dp.toPx() }
+            val availablePx = (screenHeightPx - topPadPx - textZonePx).coerceAtLeast(screenHeightPx * 0.55f)
+            val coverSizePx = minOf(availablePx / 1.5f, screenWidthPx * 0.42f)
+            val coverSize = with(density) { coverSizePx.toDp() }
+            val centerYPx = topPadPx + coverSizePx / 2f
+            val itemSpacing = coverSizePx * 0.62f
 
             CoverFlowMetrics(
                 coverSizeDp = coverSize,
@@ -311,14 +322,15 @@ private fun CoverFlowContent(
                     coverSizePx = coverSizePx,
                     screenWidthPx = screenWidthPx,
                     screenHeightPx = screenHeightPx,
+                    centerYPx = centerYPx,
                     itemSpacing = itemSpacing,
-                    maxRotation = 60f,
-                    minScale = 0.72f,
+                    maxRotation = 58f,
+                    minScale = 0.70f,
                     maxScale = 1f,
-                    minAlpha = 0.54f,
+                    minAlpha = 0.62f,
                     maxAlpha = 1f,
                     cameraDistance = 8800f,
-                    maxSideCount = 3,
+                    maxSideCount = 2,
                     unifiedSpacingMultiplier = 1f
                 )
             )
@@ -407,8 +419,9 @@ private fun CoverFlowContent(
                 )
             }
 
+            // 文字放到倒影淡出之后，和封面不再互相压字
             val titleOffsetY = with(density) {
-                (metrics.layoutParams.centerY + metrics.coverSizePx * 0.86f).toDp()
+                (metrics.layoutParams.centerY + metrics.coverSizePx + 12.dp.toPx()).toDp()
             }
 
             Column(
@@ -501,6 +514,7 @@ private data class CoverFlowLayoutParams(
     val coverSizePx: Float,
     val screenWidthPx: Float,
     val screenHeightPx: Float,
+    val centerYPx: Float,
     val itemSpacing: Float,
     val maxRotation: Float,
     val minScale: Float,
@@ -514,7 +528,7 @@ private data class CoverFlowLayoutParams(
     val displayCount: Int get() = maxSideCount * 2 + 1
     val centerOffset: Int get() = displayCount / 2
     val centerX: Float get() = screenWidthPx / 2f
-    val centerY: Float get() = screenHeightPx * 0.41f
+    val centerY: Float get() = centerYPx
 }
 
 private fun calculateCoverFlowItem(

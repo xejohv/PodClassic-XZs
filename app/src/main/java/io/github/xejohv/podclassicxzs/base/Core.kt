@@ -310,6 +310,9 @@ object Core {
         timer.start(0L)
     }
 
+    /** 供设置页原地重建界面（切换语言后不退出应用，直接重建 Activity） */
+    fun getActivityInstance(): MainActivity? = activity
+
     fun reboot() {
         if (Values.LAUNCHER) {
             SPManager.save()
@@ -352,8 +355,27 @@ object Core {
     }
 
 
+    /** 对外广播的蓝牙名：别的设备搜到的是 iPod Classic，而不是 Xperia XZs */
+    private const val BLUETOOTH_NAME = "iPod Classic"
+
+    /**
+     * 每次启动把蓝牙名改回来。系统恢复出厂 / 换机 / 被别处改过都能自愈，
+     * 名字已经对了就不写，避免每次开机都重启蓝牙。
+     */
+    fun applyBluetoothName() {
+        try {
+            val adapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter() ?: return
+            if (!adapter.isEnabled) return
+            if (adapter.name == BLUETOOTH_NAME) return
+            adapter.name = BLUETOOTH_NAME
+        } catch (e: Exception) {
+            android.util.Log.w("Core", "rename bluetooth failed", e)
+        }
+    }
+
     fun init() {
         setLanguage()
+        applyBluetoothName()
         // 无论是否加载Activity都需要初始化
         //MediaStoreUtil.prepare()
         //AppWidget.updateRemoteViews(null)

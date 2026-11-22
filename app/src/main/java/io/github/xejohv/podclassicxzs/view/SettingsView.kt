@@ -76,810 +76,877 @@ class SettingsView(context: Context) : RecyclerListView(context), ScreenView {
     }
 
     init {
-        itemList = arrayListOf(
-            Item(Strings.ABOUT, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    Core.addView(
-                        InfoListView(
-                            context, arrayListOf(
-                                Item(Strings.iPod, null, false),
-                                Item(Strings.SONG, null, MediaStoreUtil.getMusicList().size.toString()),
-                                Item(Strings.VIDEO, null, MediaStoreUtil.getVideoSize().toString()),
-                                Item(Strings.PHOTO, null, MediaStoreUtil.getPhotoSize().toString()),
-                                Item(Strings.CAPACITY, null, StorageUtil.totalText()),
-                                Item(Strings.CAPACITY_AVAILABLE, null, StorageUtil.freeText()),
-                                *storageDetailItems(),
-                                Item(Strings.VERSION, object : OnItemClickListener {
-                                    var count = 0
-                                    var lastClickMs = 0L
-                                    override fun onItemClick(
-                                        index: Int,
-                                        listView: RecyclerListView
-                                    ): Boolean {
-                                        // 一次触摸会被列表派发多次（先选中再进入），
-                                        // 300ms 内的重复回调只算一次，保证"点 6 次"就是 6 次
-                                        val now = android.os.SystemClock.elapsedRealtime()
-                                        if (now - lastClickMs < 300L) {
-                                            return true
-                                        }
-                                        lastClickMs = now
-                                        count++
-                                        // 点满 6 次翻出 iPod 彩蛋页；再点一下中间键就进系统设置。
-                                        // 计数只活在这一次打开的"关于本机"里，退出去再进来要重新点 6 次。
-                                        if (count >= 6) {
-                                            count = 0
-                                            val easterEgg = TxtView(
-                                                context,
-                                                Strings.iPod,
-                                                "iPod"
-                                            )
-                                            easterEgg.gravity = android.view.Gravity.CENTER
-                                            easterEgg.textSize = 54f
-                                            easterEgg.onEnter = {
-                                                try {
-                                                    val intent = Intent(Settings.ACTION_SETTINGS)
-                                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                    context.startActivity(intent)
-                                                    // 这台机器的导航栏被整体拿掉了，系统设置里没有返回按钮，
-                                                    // 所以进去的同时盖一条自己的控制条（返回 / iPod）
-                                                    GestureService.showExitBar(false)
-                                                } catch (e: Exception) {
-                                                    android.util.Log.w("SettingsView", "open system settings failed", e)
-                                                }
-                                                true
-                                            }
-                                            Core.addView(easterEgg)
-                                            // 彩蛋页也常驻一条浮条：全局返回在这台机器上对这个页面不生效，
-                                            // 浮条上的「← 返回」会直接调本体的 home()，保证一定退得出来
-                                            GestureService.showExitBar(false)
-                                        }
-                                        return true
-                                    }
-                                }, Values.getVersionName()),
-                                Item(
-                                    Strings.SN, null,
-                                    Base64.encodeToString(
-                                        Build.ID.encodeToByteArray(),
-                                        Base64.NO_PADDING
-                                    ).trim()
-                                        .uppercase(Locale.ROOT)
-                                ),//android.os.Build.SERIAL),
-                                Item(Strings.MODEL, null, "MA446ZP"),
-                                Item(Strings.FORMAT, null, "Windows")
-                            ), Strings.ABOUT
-                        )
-                    )
-                    return true
-                }
-            }, true),
+        itemList = mainItems()
+    }
 
-            Item(Strings.LANGUAGE, object : OnItemClickListener {
-                val itemList = arrayListOf(
-                    //id和这的顺序要对应
-                    Item(
-                        Strings.AUTO,
-                        null,
-                        if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.AUTO.id) Strings.CURRENT else Strings.NULL
-                    ),
-                    Item(
-                        Strings.LANGUAGE_CN,
-                        null,
-                        if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.CN.id) Strings.CURRENT else Strings.NULL
-                    ),
-                    Item(
-                        Strings.LANGUAGE_TW,
-                        null,
-                        if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.TW.id) Strings.CURRENT else Strings.NULL
-                    ),
-                    Item(
-                        Strings.LANGUAGE_EN,
-                        null,
-                        if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.EN.id) Strings.CURRENT else Strings.NULL
-                    ),
-                )
+    /** 分类入口：点一下进二级页，主页只留几行 */
+    private fun group(name: String, items: ArrayList<Item>): Item {
+        return Item(name, object : OnItemClickListener {
+            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                Core.addView(ItemListView(context, items, name, null))
+                return true
+            }
+        }, true)
+    }
 
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    Core.addView(
-                        ItemListView(
-                            context,
-                            itemList,
-                            Strings.LANGUAGE,
-                            object : OnItemClickListener {
+    private fun mainItems(): ArrayList<Item> = arrayListOf(
+        group(Strings.GROUP_PLAY, playItems()),
+        group(Strings.GROUP_SOUND, soundItems()),
+        group(Strings.GROUP_RECORD, recordItems()),
+        group(Strings.GROUP_LOOK, lookItems()),
+        group(Strings.GROUP_SYSTEM, systemItems())
+    )
+
+    // 播放与显示
+    private fun playItems(): ArrayList<Item> = arrayListOf(
+                        Item(
+                            Strings.AUTO_PLAY, object : OnItemClickListener {
                                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    SPManager.setInt(SPManager.Language.SP_NAME, index)
-                                    // 先把语言真正落到 resources 上（之前只算了 configuration 没应用，所以永远无效），
-                                    // 再重启进程让整机界面用新语言重新构建
-                                    LocaleHelper.applyTo(io.github.xejohv.podclassicxzs.base.BaseApplication.context)
-                                    Strings.init()
-                                    Core.reboot()
+                                    var autoStop = SPManager.getInt(
+                                        SPManager.AutoStop.SP_NAME
+                                    )
+                                    autoStop++
+                                    autoStop %= SPManager.AutoStop.values
+                                    SPManager.setInt(
+                                        SPManager.AutoStop.SP_NAME, autoStop
+                                    )
+                                    listView.getCurrentItem().rightText = SPManager.AutoStop.getString(autoStop)
                                     return true
                                 }
-                            })
-                    ); return true
-                }
-            }, true),
-
-            Item(Strings.SLEEP_TIME, object : OnItemClickListener {
-                fun scheduleToStop(min: Int) {
-                    MediaPresenter.setStopTime(min)
-                    Core.removeView()
-                }
-
-                val itemList = arrayListOf(
-                    Item(Strings.DISABLE, object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            scheduleToStop(0); return true
-                        }
-                    }, false),
-                    //Item("1 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(1); return true } }, false),
-                    Item("15 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            scheduleToStop(15); return true
-                        }
-                    }, false),
-                    Item("30 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            scheduleToStop(30); return true
-                        }
-                    }, false),
-                    Item("60 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            scheduleToStop(60); return true
-                        }
-                    }, false),
-                    Item("90 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            scheduleToStop(90); return true
-                        }
-                    }, false),
-                    Item("120 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            scheduleToStop(120); return true
-                        }
-                    }, false),
-                    Item("240 ${Strings.MINUTE}", object : OnItemClickListener {
-                        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                            scheduleToStop(240); return true
-                        }
-                    }, false)
-                )
-
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    Core.addView(ItemListView(context, itemList, "睡眠定时", null)); return true
-                }
-            }, true),
-
-            Item(Strings.EQUALIZER, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    val nameList = MediaPresenter.getPresetList()
-                    val itemList = ArrayList<Item>()
-                    val equalizerIndex = SPManager.getInt(
-                        SPManager.SP_EQUALIZER
-                    )
-                    for (i in nameList.indices) {
-                        itemList.add(
-                            Item(
-                                nameList[i]!!,
-                                null,
-                                if (i == equalizerIndex) Strings.CURRENT else Strings.NULL
+                            }, SPManager.AutoStop.getString(
+                                SPManager.getInt(
+                                    SPManager.AutoStop.SP_NAME
+                                )
                             )
-                        )
-                    }
-                    Core.addView(
-                        ItemListView(
-                            context,
-                            itemList,
-                            Strings.EQUALIZER,
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    MediaPresenter.setEqualizer(index)
-                                    Core.removeView()
-                                    return true
-                                }
-                            })
-                    )
-                    return true
-                }
-            }, true),
-
-            Item(Strings.PLAY_MODE, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    val playMode = MediaPresenter.getPlayMode()
-                    val next = PlayMode.getPlayMode((playMode.id + 1) % PlayMode.count)
-                    MediaPresenter.nextPlayMode()
-                    listView.getCurrentItem().rightText = next.title
-                    return true
-                }
-            }, MediaPresenter.getPlayMode().title),
-
-            Item(
-                Strings.SHUFFLE_PLAY, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                        SPManager.getBoolean(
-                            SPManager.SP_PLAY_ALL
-                        ).let {
-                            SPManager.setBoolean(
-                                SPManager.SP_PLAY_ALL, !it
-                            )
-                            listView.getCurrentItem().rightText =
-                                if (it) Strings.SAVE else Strings.ALL
-                        }
-                        return true
-                    }
-                }, if (SPManager.getBoolean(
-                        SPManager.SP_PLAY_ALL
-                    )
-                ) Strings.ALL else Strings.SAVE
-            ),
-
-            Item(Strings.REPEAT_MODE, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    val repeatMode = MediaPresenter.getRepeatMode()
-                    val next = RepeatMode.getRepeatMode((repeatMode.id + 1) % RepeatMode.count)
-                    MediaPresenter.nextRepeatMode()
-                    listView.getCurrentItem().rightText = next.title
-                    return true
-                }
-            }, MediaPresenter.getRepeatMode().title),
-
-            Item(
-                Strings.NIGHT_MODE, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                        var nightMode = SPManager.getInt(SPManager.NightMode.SP_NAME)
-                        nightMode++
-                        nightMode %= SPManager.NightMode.values
-                        SPManager.setInt(
-                            SPManager.NightMode.SP_NAME, nightMode
-                        )
-                        Core.setNightMode()
-                        listView.getCurrentItem().rightText =
-                            SPManager.NightMode.getTitle(nightMode)
-                        return true
-                    }
-
-                }, SPManager.NightMode.getTitle(
-                    SPManager.getInt(
-                        SPManager.NightMode.SP_NAME
-                    )
-                )
-            ),
-
-            SwitchBar(
-                Strings.PLAY_WITH_OTHER,
-                SPManager.SP_AUDIO_FOCUS,
-                true,
-                object : OnSwitchListener {
-                    override fun onSwitch() {
-                        MediaPresenter.setAudioFocus()
-                    }
-                }),
-
-            Item(
-                Strings.TOUCH_FEEDBACK, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                        var sound = SPManager.getInt(
-                            SPManager.Sound.SP_NAME
-                        )
-                        sound++
-                        sound %= SPManager.Sound.values
-                        SPManager.setInt(
-                            SPManager.Sound.SP_NAME, sound
-                        )
-                        listView.getCurrentItem().rightText = SPManager.Sound.getTitle(sound)
-                        return true
-                    }
-                }, SPManager.Sound.getTitle(
-                    SPManager.getInt(
-                        SPManager.Sound.SP_NAME
-                    )
-                )
-            ),
-
-            Item(
-                "机身配色", object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                        Core.addView(ThemeView(context))
-                        return true
-                    }
-                }, SPManager.BodyColor.of(Colors.bodyId).cnTitle
-            ),
-
-            SwitchBar(Strings.SHOW_LYRIC, SPManager.SP_SHOW_LYRIC),
-
-            SwitchBar(Strings.SHOW_INFO, SPManager.SP_SHOW_INFO),
-
-            SwitchBar(Strings.SHOW_TIME, SPManager.SP_SHOW_TIME),
-
-            Item(
-                Strings.AUTO_PLAY, object : OnItemClickListener {
-                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                        var autoStop = SPManager.getInt(
-                            SPManager.AutoStop.SP_NAME
-                        )
-                        autoStop++
-                        autoStop %= SPManager.AutoStop.values
-                        SPManager.setInt(
-                            SPManager.AutoStop.SP_NAME, autoStop
-                        )
-                        listView.getCurrentItem().rightText = SPManager.AutoStop.getString(autoStop)
-                        return true
-                    }
-                }, SPManager.AutoStop.getString(
-                    SPManager.getInt(
-                        SPManager.AutoStop.SP_NAME
-                    )
-                )
-            ),
-
-            SwitchBar(Strings.COVER_FLOW, SPManager.SP_COVER_FLOW),
-
-            SwitchBar(
-                "系统AGC",
-                SPManager.SP_AGC_ENABLED,
-                false,
-                object : OnSwitchListener {
-                    override fun onSwitch() {
-                        MediaPresenter.setAgcEnabled()
-                    }
-                }),
-
-            SwitchBar(
-                "TomSteady",
-                SPManager.SP_TOM_STEADY_ENABLED,
-                false,
-                object : OnSwitchListener {
-                    override fun onSwitch() {
-                        MediaPresenter.setTomSteadyEnabled()
-                    }
-                }),
-
-            Item("TomSteady设置", object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    val itemList = arrayListOf(
-                        Item(
-                            "目标电平",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换目标电平值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.7f)
-                                    val values = arrayOf(0.5f, 0.6f, 0.7f, 0.8f, 0.9f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, nextValue)
-                                    MediaPresenter.setTomSteadyParameters(targetLevel = nextValue)
-                                    listView.getCurrentItem().rightText = nextValue.toString()
-                                    return true
-                                }
-                            },
-                            SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.7f).toString()
                         ),
+                        Item(Strings.PLAY_MODE, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                val playMode = MediaPresenter.getPlayMode()
+                                val next = PlayMode.getPlayMode((playMode.id + 1) % PlayMode.count)
+                                MediaPresenter.nextPlayMode()
+                                listView.getCurrentItem().rightText = next.title
+                                return true
+                            }
+                        }, MediaPresenter.getPlayMode().title),
                         Item(
-                            "最大增益",
-                            object : OnItemClickListener {
+                            Strings.SHUFFLE_PLAY, object : OnItemClickListener {
                                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换最大增益值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 20.0f)
-                                    val values = arrayOf(10.0f, 15.0f, 20.0f, 25.0f, 30.0f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, nextValue)
-                                    MediaPresenter.setTomSteadyParameters(maxGain = nextValue)
-                                    listView.getCurrentItem().rightText = nextValue.toString() + "dB"
-                                    return true
-                                }
-                            },
-                            SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 20.0f).toString() + "dB"
-                        ),
-                        Item(
-                            "攻击时间",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换攻击时间值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, 50.0f)
-                                    val values = arrayOf(20.0f, 50.0f, 100.0f, 150.0f, 200.0f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, nextValue)
-                                    MediaPresenter.setTomSteadyParameters(attackTime = nextValue)
-                                    listView.getCurrentItem().rightText = nextValue.toString() + "ms"
-                                    return true
-                                }
-                            },
-                            SPManager.getFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, 50.0f).toString() + "ms"
-                        ),
-                        Item(
-                            "释放时间",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换释放时间值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, 200.0f)
-                                    val values = arrayOf(100.0f, 200.0f, 300.0f, 400.0f, 500.0f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, nextValue)
-                                    MediaPresenter.setTomSteadyParameters(releaseTime = nextValue)
-                                    listView.getCurrentItem().rightText = nextValue.toString() + "ms"
-                                    return true
-                                }
-                            },
-                            SPManager.getFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, 200.0f).toString() + "ms"
-                        )
-                    )
-                    Core.addView(
-                        ItemListView(
-                            context,
-                            itemList,
-                            "TomSteady设置",
-                            null
-                        )
-                    )
-                    return true
-                }
-            }, true),
-
-            SwitchBar(
-                "胆机音效",
-                SPManager.SP_TUBE_AMP_ENABLED,
-                false,
-                object : OnSwitchListener {
-                    override fun onSwitch() {
-                        MediaPresenter.setTubeAmpEnabled()
-                    }
-                }),
-
-            Item("胆机音效设置", object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    val itemList = arrayListOf(
-                        Item(
-                            "预设模式",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    val presets = io.github.xejohv.podclassicxzs.media.TubeAmpPreset.values()
-                                    val currentPresetIndex = SPManager.getInt(SPManager.SP_TUBE_AMP_PRESET)
-                                    val nextPresetIndex = (currentPresetIndex + 1) % presets.size
-                                    val nextPreset = presets[nextPresetIndex]
-                                    SPManager.setInt(SPManager.SP_TUBE_AMP_PRESET, nextPresetIndex)
-                                    MediaPresenter.applyTubeAmpPreset(nextPreset)
-                                    listView.getCurrentItem().rightText = nextPreset.displayName
-                                    return true
-                                }
-                            },
-                            io.github.xejohv.podclassicxzs.media.TubeAmpPreset.values()[
-                                SPManager.getInt(SPManager.SP_TUBE_AMP_PRESET)
-                                    .coerceIn(0, io.github.xejohv.podclassicxzs.media.TubeAmpPreset.values().size - 1)
-                            ].displayName
-                        ),
-                        Item(
-                            "温暖度",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换温暖度值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_WARMTH, 0.5f)
-                                    val values = arrayOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_TUBE_AMP_WARMTH, nextValue)
-                                    MediaPresenter.setTubeAmpParameters(warmth = nextValue)
-                                    listView.getCurrentItem().rightText = when (nextValue) {
-                                        0.0f -> "关闭"
-                                        0.25f -> "轻度"
-                                        0.5f -> "中等"
-                                        0.75f -> "高度"
-                                        1.0f -> "最大"
-                                        else -> nextValue.toString()
+                                    SPManager.getBoolean(
+                                        SPManager.SP_PLAY_ALL
+                                    ).let {
+                                        SPManager.setBoolean(
+                                            SPManager.SP_PLAY_ALL, !it
+                                        )
+                                        listView.getCurrentItem().rightText =
+                                            if (it) Strings.SAVE else Strings.ALL
                                     }
                                     return true
                                 }
-                            },
-                            when (SPManager.getFloat(SPManager.SP_TUBE_AMP_WARMTH, 0.5f)) {
-                                0.0f -> "关闭"
-                                0.25f -> "轻度"
-                                0.5f -> "中等"
-                                0.75f -> "高度"
-                                1.0f -> "最大"
-                                else -> "中等"
-                            }
+                            }, if (SPManager.getBoolean(
+                                    SPManager.SP_PLAY_ALL
+                                )
+                            ) Strings.ALL else Strings.SAVE
                         ),
-                        Item(
-                            "饱和度",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换饱和度值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_SATURATION, 0.6f)
-                                    val values = arrayOf(0.2f, 0.4f, 0.6f, 0.8f, 1.0f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_TUBE_AMP_SATURATION, nextValue)
-                                    MediaPresenter.setTubeAmpParameters(saturation = nextValue)
-                                    listView.getCurrentItem().rightText = when (nextValue) {
-                                        0.2f -> "低"
-                                        0.4f -> "中低"
-                                        0.6f -> "中"
-                                        0.8f -> "中高"
-                                        1.0f -> "高"
-                                        else -> nextValue.toString()
-                                    }
-                                    return true
-                                }
-                            },
-                            when (SPManager.getFloat(SPManager.SP_TUBE_AMP_SATURATION, 0.6f)) {
-                                0.2f -> "低"
-                                0.4f -> "中低"
-                                0.6f -> "中"
-                                0.8f -> "中高"
-                                1.0f -> "高"
-                                else -> "中"
+                        Item(Strings.REPEAT_MODE, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                val repeatMode = MediaPresenter.getRepeatMode()
+                                val next = RepeatMode.getRepeatMode((repeatMode.id + 1) % RepeatMode.count)
+                                MediaPresenter.nextRepeatMode()
+                                listView.getCurrentItem().rightText = next.title
+                                return true
                             }
-                        ),
-                        Item(
-                            "谐波含量",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换谐波含量值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_HARMONICS, 0.3f)
-                                    val values = arrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_TUBE_AMP_HARMONICS, nextValue)
-                                    MediaPresenter.setTubeAmpParameters(harmonics = nextValue)
-                                    listView.getCurrentItem().rightText = when (nextValue) {
-                                        0.1f -> "低"
-                                        0.2f -> "中低"
-                                        0.3f -> "中"
-                                        0.4f -> "中高"
-                                        0.5f -> "高"
-                                        else -> nextValue.toString()
-                                    }
-                                    return true
-                                }
-                            },
-                            when (SPManager.getFloat(SPManager.SP_TUBE_AMP_HARMONICS, 0.3f)) {
-                                0.1f -> "低"
-                                0.2f -> "中低"
-                                0.3f -> "中"
-                                0.4f -> "中高"
-                                0.5f -> "高"
-                                else -> "中"
+                        }, MediaPresenter.getRepeatMode().title),
+                        Item(Strings.SLEEP_TIME, object : OnItemClickListener {
+                            fun scheduleToStop(min: Int) {
+                                MediaPresenter.setStopTime(min)
+                                Core.removeView()
                             }
-                        )
-                    )
-                    Core.addView(
-                        ItemListView(
-                            context,
-                            itemList,
-                            "胆机音效设置",
-                            null
-                        )
-                    )
-                    return true
-                }
-            }, true),
-
-            SwitchBar(
-                "DC相位线性器",
-                SPManager.SP_DC_PHASE_ENABLED,
-                false,
-                object : OnSwitchListener {
-                    override fun onSwitch() {
-                        MediaPresenter.setDCPhaseEnabled()
-                    }
-                }),
-
-            Item("DC相位线性器设置", object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    val itemList = arrayListOf(
-                        Item(
-                            "预设模式",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    val presets = io.github.xejohv.podclassicxzs.media.DCPhasePreset.values()
-                                    val currentPresetIndex = SPManager.getInt(SPManager.SP_DC_PHASE_PRESET)
-                                    val nextPresetIndex = (currentPresetIndex + 1) % presets.size
-                                    val nextPreset = presets[nextPresetIndex]
-                                    SPManager.setInt(SPManager.SP_DC_PHASE_PRESET, nextPresetIndex)
-                                    MediaPresenter.applyDCPhasePreset(nextPreset)
-                                    listView.getCurrentItem().rightText = nextPreset.displayName
-                                    return true
-                                }
-                            },
-                            io.github.xejohv.podclassicxzs.media.DCPhasePreset.values()[
-                                SPManager.getInt(SPManager.SP_DC_PHASE_PRESET)
-                                    .coerceIn(0, io.github.xejohv.podclassicxzs.media.DCPhasePreset.values().size - 1)
-                            ].displayName
-                        ),
-                        Item(
-                            "校正强度",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换校正强度值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_STRENGTH, 0.5f)
-                                    val values = arrayOf(0.2f, 0.4f, 0.5f, 0.6f, 0.8f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_DC_PHASE_STRENGTH, nextValue)
-                                    MediaPresenter.setDCPhaseParameters(strength = nextValue)
-                                    listView.getCurrentItem().rightText = when (nextValue) {
-                                        0.2f -> "低"
-                                        0.4f -> "中低"
-                                        0.5f -> "中"
-                                        0.6f -> "中高"
-                                        0.8f -> "高"
-                                        else -> nextValue.toString()
-                                    }
-                                    return true
-                                }
-                            },
-                            when (SPManager.getFloat(SPManager.SP_DC_PHASE_STRENGTH, 0.5f)) {
-                                0.2f -> "低"
-                                0.4f -> "中低"
-                                0.5f -> "中"
-                                0.6f -> "中高"
-                                0.8f -> "高"
-                                else -> "中"
-                            }
-                        ),
-                        Item(
-                            "低频延迟",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换低频延迟值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_LOW_DELAY, 0.3f)
-                                    val values = arrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_DC_PHASE_LOW_DELAY, nextValue)
-                                    MediaPresenter.setDCPhaseParameters(lowDelay = nextValue)
-                                    listView.getCurrentItem().rightText = when (nextValue) {
-                                        0.1f -> "短"
-                                        0.2f -> "中短"
-                                        0.3f -> "中"
-                                        0.4f -> "中长"
-                                        0.5f -> "长"
-                                        else -> nextValue.toString()
-                                    }
-                                    return true
-                                }
-                            },
-                            when (SPManager.getFloat(SPManager.SP_DC_PHASE_LOW_DELAY, 0.3f)) {
-                                0.1f -> "短"
-                                0.2f -> "中短"
-                                0.3f -> "中"
-                                0.4f -> "中长"
-                                0.5f -> "长"
-                                else -> "中"
-                            }
-                        ),
-                        Item(
-                            "中频延迟",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换中频延迟值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_MID_DELAY, 0.2f)
-                                    val values = arrayOf(0.05f, 0.1f, 0.2f, 0.3f, 0.4f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_DC_PHASE_MID_DELAY, nextValue)
-                                    MediaPresenter.setDCPhaseParameters(midDelay = nextValue)
-                                    listView.getCurrentItem().rightText = when (nextValue) {
-                                        0.05f -> "极短"
-                                        0.1f -> "短"
-                                        0.2f -> "中"
-                                        0.3f -> "中长"
-                                        0.4f -> "长"
-                                        else -> nextValue.toString()
-                                    }
-                                    return true
-                                }
-                            },
-                            when (SPManager.getFloat(SPManager.SP_DC_PHASE_MID_DELAY, 0.2f)) {
-                                0.05f -> "极短"
-                                0.1f -> "短"
-                                0.2f -> "中"
-                                0.3f -> "中长"
-                                0.4f -> "长"
-                                else -> "中"
-                            }
-                        ),
-                        Item(
-                            "高频延迟",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换高频延迟值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, 0.1f)
-                                    val values = arrayOf(0.0f, 0.05f, 0.1f, 0.15f, 0.2f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, nextValue)
-                                    MediaPresenter.setDCPhaseParameters(highDelay = nextValue)
-                                    listView.getCurrentItem().rightText = when (nextValue) {
-                                        0.0f -> "无"
-                                        0.05f -> "极短"
-                                        0.1f -> "短"
-                                        0.15f -> "中"
-                                        0.2f -> "长"
-                                        else -> nextValue.toString()
-                                    }
-                                    return true
-                                }
-                            },
-                            when (SPManager.getFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, 0.1f)) {
-                                0.0f -> "无"
-                                0.05f -> "极短"
-                                0.1f -> "短"
-                                0.15f -> "中"
-                                0.2f -> "长"
-                                else -> "短"
-                            }
-                        ),
-                        Item(
-                            "分频点",
-                            object : OnItemClickListener {
-                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                                    // 循环切换分频点值
-                                    val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_CROSSOVER, 500.0f)
-                                    val values = arrayOf(300.0f, 400.0f, 500.0f, 600.0f, 800.0f)
-                                    val currentIndex = values.indexOfFirst { it == currentValue }
-                                    val nextIndex = (currentIndex + 1) % values.size
-                                    val nextValue = values[nextIndex]
-                                    SPManager.setFloat(SPManager.SP_DC_PHASE_CROSSOVER, nextValue)
-                                    MediaPresenter.setDCPhaseParameters(crossover = nextValue)
-                                    listView.getCurrentItem().rightText = nextValue.toInt().toString() + "Hz"
-                                    return true
-                                }
-                            },
-                            SPManager.getFloat(SPManager.SP_DC_PHASE_CROSSOVER, 500.0f).toInt().toString() + "Hz"
-                        )
-                    )
-                    Core.addView(
-                        ItemListView(
-                            context,
-                            itemList,
-                            "DC相位线性器设置",
-                            null
-                        )
-                    )
-                    return true
-                }
-            }, true),
-
-            Item(Strings.RESET_ALL_SETTINGS, object : OnItemClickListener {
-                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
-                    Core.addView(
-                        ItemListView(
-                            context, arrayListOf(
-                                Item(Strings.CANCEL, object : OnItemClickListener {
-                                    override fun onItemClick(
-                                        index: Int,
-                                        listView: RecyclerListView
-                                    ): Boolean {
-                                        Core.removeView(); return true
+            
+                            val itemList = arrayListOf(
+                                Item(Strings.DISABLE, object : OnItemClickListener {
+                                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                        scheduleToStop(0); return true
                                     }
                                 }, false),
-                                Item(Strings.RESET, object : OnItemClickListener {
-                                    override fun onItemClick(
-                                        index: Int,
-                                        listView: RecyclerListView
-                                    ): Boolean {
-                                        Core.reset();Core.removeView(); return true
+                                //Item("1 分钟", object : OnItemClickListener { override fun onItemClick(index: Int, listView: ListView) : Boolean {scheduleToStop(1); return true } }, false),
+                                Item("15 ${Strings.MINUTE}", object : OnItemClickListener {
+                                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                        scheduleToStop(15); return true
+                                    }
+                                }, false),
+                                Item("30 ${Strings.MINUTE}", object : OnItemClickListener {
+                                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                        scheduleToStop(30); return true
+                                    }
+                                }, false),
+                                Item("60 ${Strings.MINUTE}", object : OnItemClickListener {
+                                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                        scheduleToStop(60); return true
+                                    }
+                                }, false),
+                                Item("90 ${Strings.MINUTE}", object : OnItemClickListener {
+                                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                        scheduleToStop(90); return true
+                                    }
+                                }, false),
+                                Item("120 ${Strings.MINUTE}", object : OnItemClickListener {
+                                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                        scheduleToStop(120); return true
+                                    }
+                                }, false),
+                                Item("240 ${Strings.MINUTE}", object : OnItemClickListener {
+                                    override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                        scheduleToStop(240); return true
                                     }
                                 }, false)
-                            ), Strings.RESET_ALL, null
-                        )
-                    )
-                    return true
-                }
-            }, true)
-        )
-    }
+                            )
+            
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                Core.addView(ItemListView(context, itemList, "睡眠定时", null)); return true
+                            }
+                        }, true),
+            
+                        // 录音质量：高 / 标准 / 低 三档循环，决定采样率与码率,
+                        SwitchBar(Strings.SHOW_LYRIC, SPManager.SP_SHOW_LYRIC),
+                        SwitchBar(Strings.SHOW_INFO, SPManager.SP_SHOW_INFO),
+                        SwitchBar(Strings.SHOW_TIME, SPManager.SP_SHOW_TIME),
+                        SwitchBar(Strings.COVER_FLOW, SPManager.SP_COVER_FLOW),
+    )
+
+    // 音效：第一行是说明页，后面是各项开关与参数
+    private fun soundItems(): ArrayList<Item> = arrayListOf(
+        Item(Strings.SOUND_HELP, object : OnItemClickListener {
+            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                Core.addView(TxtView(context, Strings.SOUND_HELP, Strings.SOUND_HELP_TEXT))
+                return true
+            }
+        }, true),
+                        Item(Strings.EQUALIZER, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                val nameList = MediaPresenter.getPresetList()
+                                val itemList = ArrayList<Item>()
+                                val equalizerIndex = SPManager.getInt(
+                                    SPManager.SP_EQUALIZER
+                                )
+                                for (i in nameList.indices) {
+                                    itemList.add(
+                                        Item(
+                                            nameList[i]!!,
+                                            null,
+                                            if (i == equalizerIndex) Strings.CURRENT else Strings.NULL
+                                        )
+                                    )
+                                }
+                                Core.addView(
+                                    ItemListView(
+                                        context,
+                                        itemList,
+                                        Strings.EQUALIZER,
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                MediaPresenter.setEqualizer(index)
+                                                Core.removeView()
+                                                return true
+                                            }
+                                        })
+                                )
+                                return true
+                            }
+                        }, true),
+                        SwitchBar(
+                            "系统AGC",
+                            SPManager.SP_AGC_ENABLED,
+                            false,
+                            object : OnSwitchListener {
+                                override fun onSwitch() {
+                                    MediaPresenter.setAgcEnabled()
+                                }
+                            }),
+                        SwitchBar(
+                            "TomSteady",
+                            SPManager.SP_TOM_STEADY_ENABLED,
+                            false,
+                            object : OnSwitchListener {
+                                override fun onSwitch() {
+                                    MediaPresenter.setTomSteadyEnabled()
+                                }
+                            }),
+                        Item("TomSteady设置", object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                val itemList = arrayListOf(
+                                    Item(
+                                        "目标电平",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换目标电平值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.7f)
+                                                val values = arrayOf(0.5f, 0.6f, 0.7f, 0.8f, 0.9f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, nextValue)
+                                                MediaPresenter.setTomSteadyParameters(targetLevel = nextValue)
+                                                listView.getCurrentItem().rightText = nextValue.toString()
+                                                return true
+                                            }
+                                        },
+                                        SPManager.getFloat(SPManager.SP_TOM_STEADY_TARGET_LEVEL, 0.7f).toString()
+                                    ),
+                                    Item(
+                                        "最大增益",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换最大增益值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 20.0f)
+                                                val values = arrayOf(10.0f, 15.0f, 20.0f, 25.0f, 30.0f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, nextValue)
+                                                MediaPresenter.setTomSteadyParameters(maxGain = nextValue)
+                                                listView.getCurrentItem().rightText = nextValue.toString() + "dB"
+                                                return true
+                                            }
+                                        },
+                                        SPManager.getFloat(SPManager.SP_TOM_STEADY_MAX_GAIN, 20.0f).toString() + "dB"
+                                    ),
+                                    Item(
+                                        "攻击时间",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换攻击时间值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, 50.0f)
+                                                val values = arrayOf(20.0f, 50.0f, 100.0f, 150.0f, 200.0f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, nextValue)
+                                                MediaPresenter.setTomSteadyParameters(attackTime = nextValue)
+                                                listView.getCurrentItem().rightText = nextValue.toString() + "ms"
+                                                return true
+                                            }
+                                        },
+                                        SPManager.getFloat(SPManager.SP_TOM_STEADY_ATTACK_TIME, 50.0f).toString() + "ms"
+                                    ),
+                                    Item(
+                                        "释放时间",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换释放时间值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, 200.0f)
+                                                val values = arrayOf(100.0f, 200.0f, 300.0f, 400.0f, 500.0f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, nextValue)
+                                                MediaPresenter.setTomSteadyParameters(releaseTime = nextValue)
+                                                listView.getCurrentItem().rightText = nextValue.toString() + "ms"
+                                                return true
+                                            }
+                                        },
+                                        SPManager.getFloat(SPManager.SP_TOM_STEADY_RELEASE_TIME, 200.0f).toString() + "ms"
+                                    )
+                                )
+                                Core.addView(
+                                    ItemListView(
+                                        context,
+                                        itemList,
+                                        "TomSteady设置",
+                                        null
+                                    )
+                                )
+                                return true
+                            }
+                        }, true),
+                        SwitchBar(
+                            "胆机音效",
+                            SPManager.SP_TUBE_AMP_ENABLED,
+                            false,
+                            object : OnSwitchListener {
+                                override fun onSwitch() {
+                                    MediaPresenter.setTubeAmpEnabled()
+                                }
+                            }),
+                        Item("胆机音效设置", object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                val itemList = arrayListOf(
+                                    Item(
+                                        "预设模式",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                val presets = io.github.xejohv.podclassicxzs.media.TubeAmpPreset.values()
+                                                val currentPresetIndex = SPManager.getInt(SPManager.SP_TUBE_AMP_PRESET)
+                                                val nextPresetIndex = (currentPresetIndex + 1) % presets.size
+                                                val nextPreset = presets[nextPresetIndex]
+                                                SPManager.setInt(SPManager.SP_TUBE_AMP_PRESET, nextPresetIndex)
+                                                MediaPresenter.applyTubeAmpPreset(nextPreset)
+                                                listView.getCurrentItem().rightText = nextPreset.displayName
+                                                return true
+                                            }
+                                        },
+                                        io.github.xejohv.podclassicxzs.media.TubeAmpPreset.values()[
+                                            SPManager.getInt(SPManager.SP_TUBE_AMP_PRESET)
+                                                .coerceIn(0, io.github.xejohv.podclassicxzs.media.TubeAmpPreset.values().size - 1)
+                                        ].displayName
+                                    ),
+                                    Item(
+                                        "温暖度",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换温暖度值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_WARMTH, 0.5f)
+                                                val values = arrayOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_TUBE_AMP_WARMTH, nextValue)
+                                                MediaPresenter.setTubeAmpParameters(warmth = nextValue)
+                                                listView.getCurrentItem().rightText = when (nextValue) {
+                                                    0.0f -> "关闭"
+                                                    0.25f -> "轻度"
+                                                    0.5f -> "中等"
+                                                    0.75f -> "高度"
+                                                    1.0f -> "最大"
+                                                    else -> nextValue.toString()
+                                                }
+                                                return true
+                                            }
+                                        },
+                                        when (SPManager.getFloat(SPManager.SP_TUBE_AMP_WARMTH, 0.5f)) {
+                                            0.0f -> "关闭"
+                                            0.25f -> "轻度"
+                                            0.5f -> "中等"
+                                            0.75f -> "高度"
+                                            1.0f -> "最大"
+                                            else -> "中等"
+                                        }
+                                    ),
+                                    Item(
+                                        "饱和度",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换饱和度值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_SATURATION, 0.6f)
+                                                val values = arrayOf(0.2f, 0.4f, 0.6f, 0.8f, 1.0f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_TUBE_AMP_SATURATION, nextValue)
+                                                MediaPresenter.setTubeAmpParameters(saturation = nextValue)
+                                                listView.getCurrentItem().rightText = when (nextValue) {
+                                                    0.2f -> "低"
+                                                    0.4f -> "中低"
+                                                    0.6f -> "中"
+                                                    0.8f -> "中高"
+                                                    1.0f -> "高"
+                                                    else -> nextValue.toString()
+                                                }
+                                                return true
+                                            }
+                                        },
+                                        when (SPManager.getFloat(SPManager.SP_TUBE_AMP_SATURATION, 0.6f)) {
+                                            0.2f -> "低"
+                                            0.4f -> "中低"
+                                            0.6f -> "中"
+                                            0.8f -> "中高"
+                                            1.0f -> "高"
+                                            else -> "中"
+                                        }
+                                    ),
+                                    Item(
+                                        "谐波含量",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换谐波含量值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_TUBE_AMP_HARMONICS, 0.3f)
+                                                val values = arrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_TUBE_AMP_HARMONICS, nextValue)
+                                                MediaPresenter.setTubeAmpParameters(harmonics = nextValue)
+                                                listView.getCurrentItem().rightText = when (nextValue) {
+                                                    0.1f -> "低"
+                                                    0.2f -> "中低"
+                                                    0.3f -> "中"
+                                                    0.4f -> "中高"
+                                                    0.5f -> "高"
+                                                    else -> nextValue.toString()
+                                                }
+                                                return true
+                                            }
+                                        },
+                                        when (SPManager.getFloat(SPManager.SP_TUBE_AMP_HARMONICS, 0.3f)) {
+                                            0.1f -> "低"
+                                            0.2f -> "中低"
+                                            0.3f -> "中"
+                                            0.4f -> "中高"
+                                            0.5f -> "高"
+                                            else -> "中"
+                                        }
+                                    )
+                                )
+                                Core.addView(
+                                    ItemListView(
+                                        context,
+                                        itemList,
+                                        "胆机音效设置",
+                                        null
+                                    )
+                                )
+                                return true
+                            }
+                        }, true),
+                        SwitchBar(
+                            "DC相位线性器",
+                            SPManager.SP_DC_PHASE_ENABLED,
+                            false,
+                            object : OnSwitchListener {
+                                override fun onSwitch() {
+                                    MediaPresenter.setDCPhaseEnabled()
+                                }
+                            }),
+                        Item("DC相位线性器设置", object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                val itemList = arrayListOf(
+                                    Item(
+                                        "预设模式",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                val presets = io.github.xejohv.podclassicxzs.media.DCPhasePreset.values()
+                                                val currentPresetIndex = SPManager.getInt(SPManager.SP_DC_PHASE_PRESET)
+                                                val nextPresetIndex = (currentPresetIndex + 1) % presets.size
+                                                val nextPreset = presets[nextPresetIndex]
+                                                SPManager.setInt(SPManager.SP_DC_PHASE_PRESET, nextPresetIndex)
+                                                MediaPresenter.applyDCPhasePreset(nextPreset)
+                                                listView.getCurrentItem().rightText = nextPreset.displayName
+                                                return true
+                                            }
+                                        },
+                                        io.github.xejohv.podclassicxzs.media.DCPhasePreset.values()[
+                                            SPManager.getInt(SPManager.SP_DC_PHASE_PRESET)
+                                                .coerceIn(0, io.github.xejohv.podclassicxzs.media.DCPhasePreset.values().size - 1)
+                                        ].displayName
+                                    ),
+                                    Item(
+                                        "校正强度",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换校正强度值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_STRENGTH, 0.5f)
+                                                val values = arrayOf(0.2f, 0.4f, 0.5f, 0.6f, 0.8f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_DC_PHASE_STRENGTH, nextValue)
+                                                MediaPresenter.setDCPhaseParameters(strength = nextValue)
+                                                listView.getCurrentItem().rightText = when (nextValue) {
+                                                    0.2f -> "低"
+                                                    0.4f -> "中低"
+                                                    0.5f -> "中"
+                                                    0.6f -> "中高"
+                                                    0.8f -> "高"
+                                                    else -> nextValue.toString()
+                                                }
+                                                return true
+                                            }
+                                        },
+                                        when (SPManager.getFloat(SPManager.SP_DC_PHASE_STRENGTH, 0.5f)) {
+                                            0.2f -> "低"
+                                            0.4f -> "中低"
+                                            0.5f -> "中"
+                                            0.6f -> "中高"
+                                            0.8f -> "高"
+                                            else -> "中"
+                                        }
+                                    ),
+                                    Item(
+                                        "低频延迟",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换低频延迟值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_LOW_DELAY, 0.3f)
+                                                val values = arrayOf(0.1f, 0.2f, 0.3f, 0.4f, 0.5f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_DC_PHASE_LOW_DELAY, nextValue)
+                                                MediaPresenter.setDCPhaseParameters(lowDelay = nextValue)
+                                                listView.getCurrentItem().rightText = when (nextValue) {
+                                                    0.1f -> "短"
+                                                    0.2f -> "中短"
+                                                    0.3f -> "中"
+                                                    0.4f -> "中长"
+                                                    0.5f -> "长"
+                                                    else -> nextValue.toString()
+                                                }
+                                                return true
+                                            }
+                                        },
+                                        when (SPManager.getFloat(SPManager.SP_DC_PHASE_LOW_DELAY, 0.3f)) {
+                                            0.1f -> "短"
+                                            0.2f -> "中短"
+                                            0.3f -> "中"
+                                            0.4f -> "中长"
+                                            0.5f -> "长"
+                                            else -> "中"
+                                        }
+                                    ),
+                                    Item(
+                                        "中频延迟",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换中频延迟值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_MID_DELAY, 0.2f)
+                                                val values = arrayOf(0.05f, 0.1f, 0.2f, 0.3f, 0.4f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_DC_PHASE_MID_DELAY, nextValue)
+                                                MediaPresenter.setDCPhaseParameters(midDelay = nextValue)
+                                                listView.getCurrentItem().rightText = when (nextValue) {
+                                                    0.05f -> "极短"
+                                                    0.1f -> "短"
+                                                    0.2f -> "中"
+                                                    0.3f -> "中长"
+                                                    0.4f -> "长"
+                                                    else -> nextValue.toString()
+                                                }
+                                                return true
+                                            }
+                                        },
+                                        when (SPManager.getFloat(SPManager.SP_DC_PHASE_MID_DELAY, 0.2f)) {
+                                            0.05f -> "极短"
+                                            0.1f -> "短"
+                                            0.2f -> "中"
+                                            0.3f -> "中长"
+                                            0.4f -> "长"
+                                            else -> "中"
+                                        }
+                                    ),
+                                    Item(
+                                        "高频延迟",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换高频延迟值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, 0.1f)
+                                                val values = arrayOf(0.0f, 0.05f, 0.1f, 0.15f, 0.2f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, nextValue)
+                                                MediaPresenter.setDCPhaseParameters(highDelay = nextValue)
+                                                listView.getCurrentItem().rightText = when (nextValue) {
+                                                    0.0f -> "无"
+                                                    0.05f -> "极短"
+                                                    0.1f -> "短"
+                                                    0.15f -> "中"
+                                                    0.2f -> "长"
+                                                    else -> nextValue.toString()
+                                                }
+                                                return true
+                                            }
+                                        },
+                                        when (SPManager.getFloat(SPManager.SP_DC_PHASE_HIGH_DELAY, 0.1f)) {
+                                            0.0f -> "无"
+                                            0.05f -> "极短"
+                                            0.1f -> "短"
+                                            0.15f -> "中"
+                                            0.2f -> "长"
+                                            else -> "短"
+                                        }
+                                    ),
+                                    Item(
+                                        "分频点",
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                // 循环切换分频点值
+                                                val currentValue = SPManager.getFloat(SPManager.SP_DC_PHASE_CROSSOVER, 500.0f)
+                                                val values = arrayOf(300.0f, 400.0f, 500.0f, 600.0f, 800.0f)
+                                                val currentIndex = values.indexOfFirst { it == currentValue }
+                                                val nextIndex = (currentIndex + 1) % values.size
+                                                val nextValue = values[nextIndex]
+                                                SPManager.setFloat(SPManager.SP_DC_PHASE_CROSSOVER, nextValue)
+                                                MediaPresenter.setDCPhaseParameters(crossover = nextValue)
+                                                listView.getCurrentItem().rightText = nextValue.toInt().toString() + "Hz"
+                                                return true
+                                            }
+                                        },
+                                        SPManager.getFloat(SPManager.SP_DC_PHASE_CROSSOVER, 500.0f).toInt().toString() + "Hz"
+                                    )
+                                )
+                                Core.addView(
+                                    ItemListView(
+                                        context,
+                                        itemList,
+                                        "DC相位线性器设置",
+                                        null
+                                    )
+                                )
+                                return true
+                            }
+                        }, true),
+    )
+
+    // 录音
+    private fun recordItems(): ArrayList<Item> = arrayListOf(
+                        Item(Strings.RECORD_QUALITY, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                val next = (SPManager.getInt(SPManager.SP_RECORD_QUALITY) + 1) % 3
+                                SPManager.setInt(SPManager.SP_RECORD_QUALITY, next)
+                                SPManager.save()
+                                listView.getCurrentItem().rightText = when (next) {
+                                    0 -> Strings.QUALITY_HIGH
+                                    2 -> Strings.QUALITY_LOW
+                                    else -> Strings.QUALITY_MID
+                                }
+                                listView.refreshItem()
+                                return true
+                            }
+                        }, when (SPManager.getInt(SPManager.SP_RECORD_QUALITY)) {
+                            0 -> Strings.QUALITY_HIGH
+                            2 -> Strings.QUALITY_LOW
+                            else -> Strings.QUALITY_MID
+                        }),
+    )
+
+    // 外观与操作
+    private fun lookItems(): ArrayList<Item> = arrayListOf(
+
+                        Item(
+                            Strings.NIGHT_MODE, object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    var nightMode = SPManager.getInt(SPManager.NightMode.SP_NAME)
+                                    nightMode++
+                                    nightMode %= SPManager.NightMode.values
+                                    SPManager.setInt(
+                                        SPManager.NightMode.SP_NAME, nightMode
+                                    )
+                                    Core.setNightMode()
+                                    listView.getCurrentItem().rightText =
+                                        SPManager.NightMode.getTitle(nightMode)
+                                    return true
+                                }
+            
+                            }, SPManager.NightMode.getTitle(
+                                SPManager.getInt(
+                                    SPManager.NightMode.SP_NAME
+                                )
+                            )
+                        ),
+                        Item(
+                            "机身配色", object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    Core.addView(ThemeView(context))
+                                    return true
+                                }
+                            }, SPManager.BodyColor.of(Colors.bodyId).cnTitle
+                        ),
+                        Item(
+                            Strings.TOUCH_FEEDBACK, object : OnItemClickListener {
+                                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                    var sound = SPManager.getInt(
+                                        SPManager.Sound.SP_NAME
+                                    )
+                                    sound++
+                                    sound %= SPManager.Sound.values
+                                    SPManager.setInt(
+                                        SPManager.Sound.SP_NAME, sound
+                                    )
+                                    listView.getCurrentItem().rightText = SPManager.Sound.getTitle(sound)
+                                    return true
+                                }
+                            }, SPManager.Sound.getTitle(
+                                SPManager.getInt(
+                                    SPManager.Sound.SP_NAME
+                                )
+                            )
+                        ),
+    )
+
+    // 系统：关于、语言、辅助功能、重置
+    private fun systemItems(): ArrayList<Item> = arrayListOf(
+                        Item(Strings.ABOUT, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                Core.addView(
+                                    InfoListView(
+                                        context, arrayListOf(
+                                            Item(Strings.iPod, null, false),
+                                            Item(Strings.SONG, null, MediaStoreUtil.getMusicList().size.toString()),
+                                            Item(Strings.VIDEO, null, MediaStoreUtil.getVideoSize().toString()),
+                                            Item(Strings.PHOTO, null, MediaStoreUtil.getPhotoSize().toString()),
+                                            // 容量明细折进二级页：关于本机只留一个合计，点进去才看内置 / SD 各自多少
+                                            Item(Strings.CAPACITY, object : OnItemClickListener {
+                                                override fun onItemClick(
+                                                    index: Int,
+                                                    listView: RecyclerListView
+                                                ): Boolean {
+                                                    val detail = arrayListOf(
+                                                        Item(Strings.CAPACITY, null, StorageUtil.totalText()),
+                                                        Item(Strings.CAPACITY_AVAILABLE, null, StorageUtil.freeText())
+                                                    )
+                                                    detail.addAll(storageDetailItems())
+                                                    Core.addView(InfoListView(context, detail, Strings.CAPACITY))
+                                                    return true
+                                                }
+                                            }, StorageUtil.totalText()),
+                                            Item(Strings.CAPACITY_AVAILABLE, null, StorageUtil.freeText()),
+                                            Item(Strings.VERSION, object : OnItemClickListener {
+                                                var count = 0
+                                                var lastClickMs = 0L
+                                                override fun onItemClick(
+                                                    index: Int,
+                                                    listView: RecyclerListView
+                                                ): Boolean {
+                                                    // 一次触摸会被列表派发多次（先选中再进入），
+                                                    // 300ms 内的重复回调只算一次，保证"点 6 次"就是 6 次
+                                                    val now = android.os.SystemClock.elapsedRealtime()
+                                                    if (now - lastClickMs < 300L) {
+                                                        return true
+                                                    }
+                                                    lastClickMs = now
+                                                    count++
+                                                    // 点满 6 次翻出 iPod 彩蛋页；再点一下中间键就进系统设置。
+                                                    // 计数只活在这一次打开的"关于本机"里，退出去再进来要重新点 6 次。
+                                                    if (count >= 6) {
+                                                        count = 0
+                                                        val easterEgg = TxtView(
+                                                            context,
+                                                            Strings.iPod,
+                                                            "iPod"
+                                                        )
+                                                        easterEgg.gravity = android.view.Gravity.CENTER
+                                                        easterEgg.textSize = 54f
+                                                        easterEgg.onEnter = {
+                                                            try {
+                                                                val intent = Intent(Settings.ACTION_SETTINGS)
+                                                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                                context.startActivity(intent)
+                                                                // 这台机器的导航栏被整体拿掉了，系统设置里没有返回按钮，
+                                                                // 所以进去的同时盖一条自己的控制条（返回 / iPod）
+                                                                GestureService.showExitBar(false)
+                                                            } catch (e: Exception) {
+                                                                android.util.Log.w("SettingsView", "open system settings failed", e)
+                                                            }
+                                                            true
+                                                        }
+                                                        Core.addView(easterEgg)
+                                                        // 彩蛋页也常驻一条浮条：全局返回在这台机器上对这个页面不生效，
+                                                        // 浮条上的「← 返回」会直接调本体的 home()，保证一定退得出来
+                                                        GestureService.showExitBar(false)
+                                                    }
+                                                    return true
+                                                }
+                                            }, Values.getVersionName()),
+                                            Item(
+                                                Strings.SN, null,
+                                                Base64.encodeToString(
+                                                    Build.ID.encodeToByteArray(),
+                                                    Base64.NO_PADDING
+                                                ).trim()
+                                                    .uppercase(Locale.ROOT)
+                                            ),//android.os.Build.SERIAL),
+                                            Item(Strings.MODEL, null, "MA446ZP"),
+                                            Item(Strings.FORMAT, null, "Windows")
+                                        ), Strings.ABOUT
+                                    )
+                                )
+                                return true
+                            }
+                        }, true),
+                        Item(Strings.LANGUAGE, object : OnItemClickListener {
+                            val itemList = arrayListOf(
+                                //id和这的顺序要对应
+                                Item(
+                                    Strings.AUTO,
+                                    null,
+                                    if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.AUTO.id) Strings.CURRENT else Strings.NULL
+                                ),
+                                Item(
+                                    Strings.LANGUAGE_CN,
+                                    null,
+                                    if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.CN.id) Strings.CURRENT else Strings.NULL
+                                ),
+                                Item(
+                                    Strings.LANGUAGE_TW,
+                                    null,
+                                    if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.TW.id) Strings.CURRENT else Strings.NULL
+                                ),
+                                Item(
+                                    Strings.LANGUAGE_EN,
+                                    null,
+                                    if (SPManager.getInt(SPManager.Language.SP_NAME) == SPManager.Language.EN.id) Strings.CURRENT else Strings.NULL
+                                ),
+                            )
+            
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                Core.addView(
+                                    ItemListView(
+                                        context,
+                                        itemList,
+                                        Strings.LANGUAGE,
+                                        object : OnItemClickListener {
+                                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                                SPManager.setInt(SPManager.Language.SP_NAME, index)
+                                                // 1. 先把偏好同步落盘（commit），否则紧接重建进程时这次写入会丢
+                                                SPManager.save()
+                                                // 2. 把语言落到 resources 上，Strings 立即按新语言重新取字符串
+                                                LocaleHelper.applyTo(io.github.xejohv.podclassicxzs.base.BaseApplication.context)
+                                                Strings.init()
+                                                // 3. 原地重建 Activity：attachBaseContext 会按新语言重新包装，
+                                                //    界面当场换成新语言，不用退出应用，也不闪系统桌面
+                                                val act = Core.getActivityInstance()
+                                                if (act != null) {
+                                                    act.recreate()
+                                                } else {
+                                                    Core.reboot()
+                                                }
+                                                return true
+                                            }
+                                        })
+                                ); return true
+                            }
+                        }, true),
+                        Item(Strings.ACCESSIBILITY, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                try {
+                                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                    // 系统无障碍设置里没有导航栏，进去的同时盖上自己的退出条
+                                    GestureService.showExitBar(false)
+                                } catch (e: Exception) {
+                                    android.util.Log.w("SettingsView", "open accessibility settings failed", e)
+                                }
+                                return true
+                            }
+                        }, if (GestureService.isConnected()) Strings.ENABLE else Strings.DISABLE),
+                        Item(Strings.RESET_ALL_SETTINGS, object : OnItemClickListener {
+                            override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                                Core.addView(
+                                    ItemListView(
+                                        context, arrayListOf(
+                                            Item(Strings.CANCEL, object : OnItemClickListener {
+                                                override fun onItemClick(
+                                                    index: Int,
+                                                    listView: RecyclerListView
+                                                ): Boolean {
+                                                    Core.removeView(); return true
+                                                }
+                                            }, false),
+                                            Item(Strings.RESET, object : OnItemClickListener {
+                                                override fun onItemClick(
+                                                    index: Int,
+                                                    listView: RecyclerListView
+                                                ): Boolean {
+                                                    Core.reset();Core.removeView(); return true
+                                                }
+                                            }, false)
+                                        ), Strings.RESET_ALL, null
+                                    )
+                                )
+                                return true
+                            }
+                        }, true)
+    )
 }

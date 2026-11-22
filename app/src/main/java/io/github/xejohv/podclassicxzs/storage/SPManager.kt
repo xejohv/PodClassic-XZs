@@ -20,6 +20,7 @@ object SPManager {
     const val SP_PLAY_MODE = "play_mode"
     const val SP_PLAY_ALL = "play_all"
     const val SP_COVER_FLOW = "cover_flow"
+    const val SP_RECORD_QUALITY = "record_quality"
     const val SP_REPEAT_MODE = "repeat_mode"
     const val SP_AGC_ENABLED = "agc_enabled"
     const val SP_TOM_STEADY_ENABLED = "tom_steady_enabled"
@@ -92,6 +93,7 @@ object SPManager {
         setInt(BodyColor.SP_NAME, BodyColor.WARM_SILVER.id)
         setBoolean(SP_SHOW_INFO, false)
         setBoolean(SP_COVER_FLOW, false)
+        setInt(SP_RECORD_QUALITY, 1)
         setInt(NightMode.SP_NAME, NightMode.DISABLE.id)
         setInt(Sound.SP_NAME, Sound.VIBRATE.id)
         setInt(AutoStop.SP_NAME, AutoStop.DISABLE_ID)
@@ -124,7 +126,10 @@ object SPManager {
     }
 
     fun save() {
-        sharedPreferences.edit().apply()
+        // 用 commit 同步落盘：语言切换/重启进程前必须先写进磁盘。
+        // 之前用 apply() 是异步写，紧接着 exitProcess 会把这次写入丢掉，
+        // 于是语言选项永远保存不下来（表现为「设置语言无效」）。
+        sharedPreferences.edit().commit()
     }
 
 

@@ -25,59 +25,28 @@ public class MediaMetadataUtil {
     private MediaMetadataUtil() {
     }
     public static String convertCodeAndGetText(String str_filepath) {
-
-        File file = new File(str_filepath);
-        BufferedReader reader;
-        String text = "";
+        // 歌词文件编码五花八门：先按 UTF-8 解，一旦出现替换字符再退回 GBK。
+        // 原来没 BOM 就一律当 GBK，UTF-8 的 .lrc 会整行乱码。
         try {
-
-            FileInputStream fis = new FileInputStream(file);
-            BufferedInputStream in = new BufferedInputStream(fis);
-            in.mark(4);
-            byte[] first3bytes = new byte[3];
-            in.read(first3bytes);
-            in.reset();
-            if (first3bytes[0] == (byte) 0xEF && first3bytes[1] == (byte) 0xBB
-                    && first3bytes[2] == (byte) 0xBF) {// utf-8
-
-                reader = new BufferedReader(new InputStreamReader(in, "utf-8"));
-
-            } else if (first3bytes[0] == (byte) 0xFF
-                    && first3bytes[1] == (byte) 0xFE) {
-
-                reader = new BufferedReader(
-                        new InputStreamReader(in, "unicode"));
-            } else if (first3bytes[0] == (byte) 0xFE
-                    && first3bytes[1] == (byte) 0xFF) {
-
-                reader = new BufferedReader(new InputStreamReader(in,
-                        "utf-16be"));
-            } else if (first3bytes[0] == (byte) 0xFF
-                    && first3bytes[1] == (byte) 0xFF) {
-
-                reader = new BufferedReader(new InputStreamReader(in,
-                        "utf-16le"));
-            } else {
-
-                reader = new BufferedReader(new InputStreamReader(in, "GBK"));
+            FileInputStream fis = new FileInputStream(str_filepath);
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int len;
+            while ((len = fis.read(buffer)) > 0) {
+                bos.write(buffer, 0, len);
             }
-            StringBuilder stringBuilder = new StringBuilder();
-            String str = reader.readLine();
-
-            while (str != null) {
-                stringBuilder.append(str);
-                str = reader.readLine();
-
+            fis.close();
+            byte[] data = bos.toByteArray();
+            String utf8 = new String(data, "UTF-8");
+            String text = utf8.startsWith("\uFEFF") ? utf8.substring(1) : utf8;
+            if (text.indexOf('\uFFFD') >= 0) {
+                text = new String(data, "GBK");
             }
-            reader.close();
-            text = stringBuilder.toString();
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+            return text;
+        } catch (Exception e) {
             e.printStackTrace();
         }
-        return text;
+        return "";
     }
     public static Lyric getLyric(File file) {
         String path = file.getPath();
@@ -306,7 +275,14 @@ public class MediaMetadataUtil {
             int index_2 = time.indexOf('.');
             int min = Integer.parseInt(time.substring(0, index_1));
             int sec = Integer.parseInt(time.substring(index_1 + 1, index_2));
-            int mil = Integer.parseInt(time.substring(index_2 + 1));
+            String msPart = time.substring(index_2 + 1);
+            int mil = Integer.parseInt(msPart);
+            // lrc 常见的 [mm:ss.xx] 里 xx 是百分秒，原来直接当毫秒用，歌词会提前一截
+            if (msPart.length() == 2) {
+                mil *= 10;
+            } else if (msPart.length() == 1) {
+                mil *= 100;
+            }
             int t = min * 60 * 1000 + sec * 1000 + mil;
             return new Lyric.LyricLine(t, lyric);
         } catch (Exception ignored) {

@@ -170,6 +170,8 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
                 scrollable = true
                 typeface = Typeface.defaultFromStyle(Typeface.NORMAL)
                 textSize = 12f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
                 setPadding(0, 0, 0, 0)
                 gravity = Gravity.CENTER
             }
@@ -251,10 +253,17 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
     override fun enterLongClick(): Boolean {
         val music = MediaPresenter.getCurrent() ?: return false
         val favourite = MusicTable.favourite
-        if (favourite.contains(music)) {
-            favourite.remove(music)
-        } else {
+        val nowFavourite = !favourite.contains(music)
+        if (nowFavourite) {
             favourite.add(music)
+        } else {
+            favourite.remove(music)
+        }
+        try {
+            val toast = android.widget.Toast.makeText(context, if (nowFavourite) "已收藏" else "已取消收藏", android.widget.Toast.LENGTH_SHORT)
+            toast.setGravity(android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL, 0, 150)
+            toast.show()
+        } catch (e: Exception) {
         }
         return true
     }
@@ -398,7 +407,7 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
             progressBar.setCurrent(progress)
             // 拖动进度条时也更新时间显示
             currentTime.text = formatTime(progress)
-            remainingTime.text = "-" + formatTime(duration - progress)
+            remainingTime.text = if (duration <= 0) "--:--" else "-" + formatTime((duration - progress).coerceAtLeast(0))
             return true
         } else {
             val currentTime = System.currentTimeMillis()
@@ -539,7 +548,7 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
                 album.setPadding(0, 0, 0, 0)
                 index.gravity = Gravity.START
                 index.setPadding(0, 0, 0, 0)
-                lyric?.gravity = Gravity.START
+                lyric?.gravity = Gravity.CENTER
             } else {
                 Log.d("MusicPlayerView3rd", "Bitmap is not null, setting to image view")
                 // 设置专辑封面
@@ -554,7 +563,7 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
                 album.setPadding(0, 0, 0, 0)
                 index.gravity = Gravity.START
                 index.setPadding(0, 0, 0, 0)
-                lyric?.gravity = Gravity.START
+                lyric?.gravity = Gravity.CENTER
                 
                 // 显示歌词区域（如果启用）
                 lyric?.visibility = if (lyric?.text.isNullOrEmpty()) GONE else VISIBLE
@@ -579,9 +588,13 @@ class MusicPlayerView3rd(context: Context) : FrameLayout(context), ScreenView {
             // 只在非拖动模式下更新时间显示，保持拖动后的时间显示方便确认
             val duration = MediaPresenter.getDuration()
             currentTime.text = formatTime(progress)
-            remainingTime.text = "-" + formatTime(duration - progress)
+            remainingTime.text = if (duration <= 0) "--:--" else "-" + formatTime((duration - progress).coerceAtLeast(0))
         }
-        lyric?.setBufferedText(MediaPresenter.getCurrent()?.lyric?.getLyric(progress))
+        lyric?.let {
+            val line = MediaPresenter.getCurrent()?.lyric?.getLyric(progress)
+            it.setBufferedText(line)
+            it.visibility = if (line.isNullOrEmpty()) GONE else VISIBLE
+        }
     }
     
     // 格式化时间为 mm:ss 格式

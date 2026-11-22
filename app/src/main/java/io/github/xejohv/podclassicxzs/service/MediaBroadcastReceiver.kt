@@ -39,6 +39,15 @@ class MediaBroadcastReceiver : BroadcastReceiver() {
             AudioManager.ACTION_AUDIO_BECOMING_NOISY -> handleAudioBecomingNoisy()
             BluetoothDevice.ACTION_ACL_DISCONNECTED -> handleBluetoothDisconnected()
             BluetoothDevice.ACTION_ACL_CONNECTED -> handleBluetoothConnected()
+            // 蓝牙刚打开时才改得动名字：启动时如果蓝牙是关的，等它开起来再校正一次
+            android.bluetooth.BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                val state = intent.getIntExtra(
+                    android.bluetooth.BluetoothAdapter.EXTRA_STATE, -1
+                )
+                if (state == android.bluetooth.BluetoothAdapter.STATE_ON) {
+                    io.github.xejohv.podclassicxzs.base.Core.applyBluetoothName()
+                }
+            }
         }
     }
     

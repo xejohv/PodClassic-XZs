@@ -44,6 +44,10 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     constructor(context: Context) : this(context, DEFAULT_MAX_SIZE)
 
     private val recyclerView: RecyclerView
+    /** 一屏真正能放下的行数：由列表高度 / 行高算出，原来固定按 MAX_SIZE 分页，
+     *  行高比预想大时最后几行永远露不出来（设置页、专辑曲目都踩过）。 */
+    private var visibleCount = DEFAULT_MAX_SIZE
+    private var measuredRows = false
     private val adapter: ItemAdapter
     private val scrollBar = ScrollBar(context)
     private val indexView = android.widget.TextView(context)
@@ -217,7 +221,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     fun setCurrent(index: Int) {
         this.index = index
         this.position =
-            (index - MAX_SIZE / 2).coerceAtMost(itemList.size - MAX_SIZE).coerceAtLeast(0)
+            (index - visibleCount / 2).coerceAtMost(itemList.size - visibleCount).coerceAtLeast(0)
         refreshList()
     }
 
@@ -234,7 +238,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             if (index < 0) {
                 index = 0
             }
-            if (position > 0 && position + MAX_SIZE > itemList.size) {
+            if (position > 0 && position + visibleCount > itemList.size) {
                 position--
             }
             refreshList()
@@ -244,7 +248,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     fun refreshList() {
         // 兜底：列表条目变少时把游标拉回有效范围，否则会出现「标题正常但整页空白」
         val n = itemList.size
-        val maxPosition = (n - MAX_SIZE).coerceAtLeast(0)
+        val maxPosition = (n - visibleCount).coerceAtLeast(0)
         if (position > maxPosition) {
             position = maxPosition
         }
@@ -269,8 +273,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
     private fun updateScrollBar() {
         val oldShowScrollBar = scrollBar.visibility == View.VISIBLE
-        scrollBar.setScrollBar(position, MAX_SIZE, itemList.size)
-        val newShowScrollBar = itemList.size > MAX_SIZE
+        scrollBar.setScrollBar(position, visibleCount, itemList.size)
+        val newShowScrollBar = itemList.size > visibleCount
         // 根据是否显示滚动条调整 RecyclerView 的 rightMargin
         recyclerParams.rightMargin = if (newShowScrollBar) DEFAULT_PADDING else 0
         recyclerView.layoutParams = recyclerParams
@@ -314,7 +318,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                     // 设置高亮到最后一个 item
                     index = lastIndex
                     // 计算 position 使最后一个 item 可见
-                    position = (lastIndex - MAX_SIZE + 1).coerceAtLeast(0)
+                    position = (lastIndex - visibleCount + 1).coerceAtLeast(0)
                 } else {
                     position = 0
                     index = 0
@@ -347,6 +351,23 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         super.onLayout(changed, left, top, right, bottom)
         if (changed) {
             refreshList()
+            measureVisibleRows()
+        }
+    }
+
+    /** 量一次行高，把「一屏几行」算准，之后分页/滚动条/自动跟随都用它 */
+    private fun measureVisibleRows() {
+        if (measuredRows) return
+        recyclerView.post {
+            if (recyclerView.childCount == 0) return@post
+            val rowHeight = recyclerView.getChildAt(0).height
+            if (rowHeight <= 0) return@post
+            val rows = (recyclerView.height / rowHeight).coerceAtLeast(1)
+            if (rows != visibleCount) {
+                visibleCount = rows
+                measuredRows = true
+                refreshList()
+            }
         }
     }
 
@@ -466,14 +487,32 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             }
         } else {
             if (index < itemList.size - 1) {
-                if (itemList.size > MAX_SIZE && index == position + MAX_SIZE - 1) {
+                if (itemList.size > visibleCount && index == position + visibleCount - 1) {
                     position++
                 }
                 index++
             }
         }
         refreshList()
+        // 选中条走出可视区时把列表跟过去：原来只看 position + MAX_SIZE，
+        // 而一屏实际能显示的行数常常少于 MAX_SIZE，多出来的条目就永远滚不到眼前。
+        ensureSelectionVisible()
         return true
+    }
+
+    /** 让当前选中项滚进可视区（优先用实际可见的首尾行判断，不再假设一屏正好 MAX_SIZE 行） */
+    private fun ensureSelectionVisible() {
+        recyclerView.post {
+            val lm = recyclerView.layoutManager as? LinearLayoutManager ?: return@post
+            val first = lm.findFirstVisibleItemPosition()
+            val last = lm.findLastVisibleItemPosition()
+            if (first == RecyclerView.NO_POSITION || last == RecyclerView.NO_POSITION) return@post
+            if (index > last) {
+                recyclerView.smoothScrollToPosition(index)
+            } else if (index < first) {
+                recyclerView.scrollToPosition(index)
+            }
+        }
     }
 
     open fun onItemClick(): Boolean {
@@ -565,7 +604,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             if (actualIndex < itemList.size) {
                 val item = itemList[actualIndex]
                 // 判断是否显示滚动条（item 数量大于 MAX_SIZE 时显示）
-                val showScrollBar = itemList.size > MAX_SIZE
+                val showScrollBar = itemList.size > visibleCount
                 holder.bind(item, highlightEnabled && actualIndex == index, item.enable, item.rightText, showScrollBar)
                 // 设置 item 的点击监听
                 onItemCreated(actualIndex, holder.itemView as ItemView)
@@ -573,7 +612,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         }
 
         override fun getItemCount(): Int {
-            return minOf(MAX_SIZE, itemList.size - position).coerceAtLeast(0)
+            return minOf(visibleCount, itemList.size - position).coerceAtLeast(0)
         }
     }
 

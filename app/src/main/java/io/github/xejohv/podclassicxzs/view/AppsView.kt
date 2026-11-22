@@ -91,6 +91,13 @@ class AppsView(context: Context) : ItemListView(
         }
     }, true)
 
+    // 录音（语音备忘录）：iPod Classic 的基础能力，放在附加程序里
+    private val recordItem = Item("录音", object : OnItemClickListener {
+        override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+            Core.addView(RecordView(context))
+            return true
+        }
+    }, true)
     // 机身配色入口：四色严格按官方发布颜色命名
     private val themeItem = Item("主题", object : OnItemClickListener {
         override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
@@ -139,6 +146,7 @@ class AppsView(context: Context) : ItemListView(
         // 整页重建，保证顺序稳定、不会因为反复进出而堆叠重复行
         val rows = arrayListOf<Item>()
         rows.add(gameItem)
+        rows.add(recordItem)
         rows.add(cameraItem)
 
         // 「所有程序」这一级去掉，程序直接摆在二级菜单里

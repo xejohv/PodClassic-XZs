@@ -491,6 +491,11 @@ public class GestureService extends AccessibilityService {
         });
     }
 
+    /** 无障碍服务当前是否已连接（悬浮条、边缘手势都靠它） */
+    public static boolean isConnected() {
+        return instance != null;
+    }
+
     /** 收起悬浮控制器 */
     public static void hideExitBar() {
         pendingExitBar = 0;
