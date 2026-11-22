@@ -60,7 +60,6 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     private var seekMode = false
 
     private val progressBar: SeekBar = SeekBar(context)
-    private val volumeBar: SeekBar = SeekBar(context)
     private var bubble: android.widget.TextView? = null
 
     private val screenLayout: ScreenLayout
@@ -207,7 +206,6 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         //setStopTime()
         //onPlayStateChange()
         //onMusicChange()
-        setVolumeBar()
     }
 
 
@@ -227,13 +225,13 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         seekMode = !seekMode
         progressBar.setSeekMode(seekMode)
         if (seekMode) {
-            setSeekBar(progressBar)
+            backToProgress()
         } else {
             val seekProgress = progressBar.getProgress()
             MediaPresenter.seekTo(seekProgress)
             // 确认快进后立即更新时间显示，避免显示旧时间
-            currentTime.text = formatTime(seekProgress)
-            remainingTime.text = "-" + formatTime(progressBar.getMax() - seekProgress)
+            setCurrentTimeText(formatTime(seekProgress))
+            setRemainingTimeText("-" + formatTime(progressBar.getMax() - seekProgress))
         }
         return true
     }
@@ -279,6 +277,60 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         else -> "顺序播放"
     }
 
+    /** 当前显示的是音量条（而非进度条） */
+    private fun inVolumeMode(): Boolean = progressBar.isShowingVolume()
+
+    /**
+     * 音量模式下，两端时间位换成喇叭图标、文字清空。
+     * 图标画在时间文字那两格里，SeekBar 内部不再额外占宽，
+     * 所以进度条与音量条的条身长度逐像素一致，切换时不跳动。
+     */
+    private fun applyVolumeIcons(show: Boolean) {
+        currentTime.setCompoundDrawablesWithIntrinsicBounds(
+            if (show) Icons.VOLUME_DOWN.drawable else null, null, null, null
+        )
+        remainingTime.setCompoundDrawablesWithIntrinsicBounds(
+            null, null, if (show) Icons.VOLUME_UP.drawable else null, null
+        )
+        if (show) {
+            currentTime.text = ""
+            remainingTime.text = ""
+        } else {
+            restoreTimeLabels()
+        }
+    }
+
+    private fun restoreTimeLabels() {
+        val cur = progressBar.getCurrent()
+        val max = progressBar.getMax()
+        currentTime.text = formatTime(cur)
+        remainingTime.text = if (max <= 1) "--:--" else "-" + formatTime(max - cur)
+    }
+
+    private fun setCurrentTimeText(text: String) {
+        if (inVolumeMode()) return
+        currentTime.text = text
+    }
+
+    private fun setRemainingTimeText(text: String) {
+        if (inVolumeMode()) return
+        remainingTime.text = text
+    }
+    /**
+     * 进入"音量显示"：不换控件、不换布局 —— 还是这条进度条，
+     * 只是临时用它画音量格数，两端时间位换成喇叭图标。
+     */
+    private fun showVolumeBar() {
+        applyVolumeIcons(true)
+        progressBar.showVolume(VolumeUtil.getCurrentVolume(), VolumeUtil.maxVolume)
+    }
+
+    /** 回到进度显示（条身位置、长度自始至终没动过，所以切换不会有跳动） */
+    private fun backToProgress() {
+        applyVolumeIcons(false)
+        progressBar.hideVolume()
+    }
+
     fun setSeekBar(seekBar: SeekBar) {
         if (screenLayout.curr() != seekBar) {
             if (screenLayout.stackSize() == 0) {
@@ -287,11 +339,6 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 screenLayout.remove()
             }
         }
-        // 音量模式下把两端的时间藏起来：iPod 的音量条只留喇叭图标和条身，
-        // 带着「03:05 / -01:10」会让人以为还是进度
-        val isVolume = seekBar === volumeBar
-        currentTime?.visibility = if (isVolume) View.INVISIBLE else View.VISIBLE
-        remainingTime?.visibility = if (isVolume) View.INVISIBLE else View.VISIBLE
     }
 
     private fun setStopTime() {
@@ -326,15 +373,6 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
         }
     }
 
-    private fun setVolumeBar() {
-        volumeBar.apply {
-            setMax(VolumeUtil.maxVolume)
-            setLeftIcon(Icons.VOLUME_DOWN.drawable)
-            setRightIcon(Icons.VOLUME_UP.drawable)
-            textVisibility = GONE
-        }
-    }
-
     /**
      * 硬件音量键 / 系统音量变化 → 同步那条"转盘换出来的音量条"。
      * 用 VolumeUtil.Watcher（ContentObserver + 轮询兜底），不再依赖不可靠的 VOLUME_CHANGED 广播。
@@ -344,18 +382,12 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
     }
     private var volumeWatcherStarted = false
 
-    /**
-     * 硬件音量键 / 系统音量变化 → 屏幕上的音量条。
-     * 之前只改了 volumeBar 的数值，但当前显示的仍是进度条，所以按音量键"什么都没发生"。
-     * 这里按和转盘同一套逻辑处理：切到音量条、刷新格数，再用同一个 2 秒计时器回落进度条。
-     */
+    /** 按音量键时切到音量显示、刷新格数，停手 2 秒回到进度条（与转盘同一套逻辑） */
     private fun onHardwareVolumeChanged(v: Int) {
         if (seekMode) return
         val max = VolumeUtil.maxVolume
-        volumeBar.textVisibility = View.GONE
-        volumeBar.setCurrent(v.coerceIn(0, max))
-        val onVolumeBar = screenLayout.curr() === volumeBar
-        if (!onVolumeBar) setSeekBar(volumeBar)
+        showVolumeBar()
+        progressBar.showVolume(v.coerceIn(0, max), max)
 
         // 连续按键时不断重置计时，停手 2 秒才回到进度条
         if (System.currentTimeMillis() - prevTimerSetTime >= 1000) {
@@ -365,7 +397,7 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             timer?.schedule(object : TimerTask() {
                 override fun run() {
                     ThreadUtil.runOnUiThread {
-                        if (screenLayout.curr() === volumeBar) setSeekBar(progressBar)
+                        if (progressBar.isShowingVolume()) backToProgress()
                     }
                 }
             }, 2000)
@@ -457,8 +489,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             progress = progress.coerceAtLeast(0).coerceAtMost(duration)
             progressBar.setCurrent(progress)
             // 拖动进度条时也更新时间显示
-            currentTime.text = formatTime(progress)
-            remainingTime.text = if (duration <= 0) "--:--" else "-" + formatTime((duration - progress).coerceAtLeast(0))
+            setCurrentTimeText(formatTime(progress))
+            setRemainingTimeText(if (duration <= 0) "--:--" else "-" + formatTime((duration - progress).coerceAtLeast(0)))
             return true
         } else {
             val currentTime = System.currentTimeMillis()
@@ -470,13 +502,13 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
                 timer?.schedule(object : TimerTask() {
                     override fun run() {
                         ThreadUtil.runOnUiThread {
-                            setSeekBar(progressBar)
+                            backToProgress()
                         }
                     }
                 }, 2000)
             }
 
-            if (screenLayout.curr() == volumeBar) {
+            if (progressBar.isShowingVolume()) {
                 var curVolume = VolumeUtil.getCurrentVolume()
                 val maxVolume = VolumeUtil.maxVolume
 
@@ -486,16 +518,15 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
                 curVolume += slideVal
                 VolumeUtil.setCurrentVolume(curVolume)
-                volumeBar.setCurrent(curVolume)
+                progressBar.showVolume(curVolume, maxVolume)
                 return true
             } else {
-                // 第一次转动：把进度条换成音量条，同时这一步就生效，不用再转一下才有反应
-                volumeBar.textVisibility = View.GONE
-                setSeekBar(volumeBar)
+                // 第一次转动：进入音量显示，同时这一步就生效，不用再转一下才有反应
+                showVolumeBar()
                 val maxVolume = VolumeUtil.maxVolume
                 val curVolume = (VolumeUtil.getCurrentVolume() + slideVal).coerceIn(0, maxVolume)
                 VolumeUtil.setCurrentVolume(curVolume)
-                volumeBar.setCurrent(curVolume)
+                progressBar.showVolume(curVolume, maxVolume)
                 return true
             }
         }
@@ -545,8 +576,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
 
         // 初始化时间显示 - 使用当前实际进度，避免显示00:00
         val currentProgress = MediaPresenter.getProgress()
-        currentTime.text = formatTime(currentProgress)
-        remainingTime.text = "-" + formatTime(duration - currentProgress)
+        setCurrentTimeText(formatTime(currentProgress))
+        setRemainingTimeText("-" + formatTime(duration - currentProgress))
 
         // 确保图片可见
         image.apply {
@@ -645,8 +676,8 @@ class MusicPlayerView(context: Context) : FrameLayout(context), ScreenView {
             progressBar.setCurrent(progress)
             // 只在非拖动模式下更新时间显示，保持拖动后的时间显示方便确认
             val duration = MediaPresenter.getDuration()
-            currentTime.text = formatTime(progress)
-            remainingTime.text = if (duration <= 0) "--:--" else "-" + formatTime((duration - progress).coerceAtLeast(0))
+            setCurrentTimeText(formatTime(progress))
+            setRemainingTimeText(if (duration <= 0) "--:--" else "-" + formatTime((duration - progress).coerceAtLeast(0)))
         }
         lyric?.let {
             val line = MediaPresenter.getCurrent()?.lyric?.getLyric(progress)

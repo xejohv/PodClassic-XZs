@@ -42,6 +42,10 @@ class SeekBar(context: Context) : LinearLayout(context) {
         val backPaint = Paint().apply { shader = null }
         val rect = RectF()
         var seekMode = false
+        /** 音量显示态：同一条条子临时改画音量格数，控件本身不移动、不替换 */
+        var volumeMode = false
+        var volumeLevel = 0
+        var volumeMax = 1
 
         // Pre-allocated Paint objects to avoid allocation in onDraw
         private val borderPaint = Paint().apply {
@@ -76,7 +80,9 @@ class SeekBar(context: Context) : LinearLayout(context) {
             canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), height.toFloat() / 2, height.toFloat() / 2, borderPaint)
             
             // Draw progress bar with glassmorphism effect
-            val progressWidth = width * current / max.toFloat()
+            val cur = if (volumeMode) volumeLevel else current
+            val mx = if (volumeMode) volumeMax else max
+            val progressWidth = width * cur / mx.toFloat()
             
             if (progressWidth > 0) {
                 // Create blue glassmorphism effect for progress
@@ -265,6 +271,23 @@ class SeekBar(context: Context) : LinearLayout(context) {
     fun getCurrent(): Int {
         return current
     }
+
+    /** 让这条条子临时显示音量（不换控件、不改布局，条身位置长度保持不变） */
+    fun showVolume(level: Int, max: Int) {
+        progressView.volumeMode = true
+        progressView.volumeLevel = level.coerceIn(0, max.coerceAtLeast(1))
+        progressView.volumeMax = max.coerceAtLeast(1)
+        progressView.invalidate()
+    }
+
+    /** 回到进度显示 */
+    fun hideVolume() {
+        if (!progressView.volumeMode) return
+        progressView.volumeMode = false
+        progressView.invalidate()
+    }
+
+    fun isShowingVolume(): Boolean = progressView.volumeMode
 
     fun setSeekMode(seekMode: Boolean) {
         progressView.seekMode = seekMode
