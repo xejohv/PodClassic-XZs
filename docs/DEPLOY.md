@@ -15,8 +15,8 @@
 ## 0. 你将得到什么
 
 - 开机直接进播放器主界面，没有状态栏/导航栏/桌面图标堆叠
-- 转盘式操作、常驻音量条、封面与歌词、视频、相机、TXT 阅读、文件管理
-- 7 个内置游戏（俄罗斯方块、贪吃蛇、飞机大战、打砖块、数独、扫雷），带存档与三档难度
+- 转盘式操作（音量条由转盘唤出、停手 2 秒自动回落、物理音量键联动）、封面与歌词、视频、相机、录音、TXT 阅读、文件管理
+- 6 个内置游戏（俄罗斯方块、贪吃蛇、飞机大战、打砖块、数独、扫雷），带存档；扫雷三档难度 + 方形触控板
 - 系统级增强（由无障碍服务实现）：
   - 三指上滑回主菜单、长按音量下 1.2s 回桌面
   - 电源菜单换成 PodClassic 风格（锁屏 / 关机 / 重新启动）
@@ -100,7 +100,7 @@ Select-String -LiteralPath build.log -Pattern "BUILD SUCCESSFUL|BUILD FAILED|^e:
 - 复制成带版本号的名字，便于回滚：
 
 ```powershell
-Copy-Item app\build\outputs\apk\release\app-release.apk ..\podclassic\PodClassicXZs_v1.5.71.apk -Force
+Copy-Item app\build\outputs\apk\release\app-release.apk ..\podclassic\PodClassicXZs_v1.5.86.apk -Force
 ```
 
 ### 2.1 构建常见坑
@@ -126,7 +126,7 @@ Copy-Item app\build\outputs\apk\release\app-release.apk ..\podclassic\PodClassic
 
 ```powershell
 adb devices      # 必须看到 <序列号>  device（不是 unauthorized）
-adb install -r ..\podclassic\PodClassicXZs_v1.5.71.apk
+adb install -r ..\podclassic\PodClassicXZs_v1.5.86.apk
 ```
 
 ### 3.2 绑定无障碍服务（核心步骤，必须做）
@@ -224,7 +224,7 @@ Start-Sleep -Seconds 12      # 让系统把服务真正拉起来
 | 3 | 长按音量下 1.2s | 回桌面（逃生用） |
 | 4 | 长按电源键 | 弹出 PodClassic 风格菜单（锁屏/关机/重新启动），系统白底菜单被盖住 |
 | 5 | 插数据线 | 面板自动切到「传输文件」，电脑能看到存储 |
-| 6 | 播放一首歌 | 封面/歌名/进度/音量条正常；后台播放不被杀 |
+| 6 | 播放一首歌 | 封面/歌名/进度正常；转盘唤出音量条、停手 2 秒回落；按机身音量键时屏幕音量条跟着动 |
 | 7 | 进游戏 → 侧滑退出 | 只保留侧边退出；折叠态不显示多余控制带 |
 | 8 | 扫雷 | 三档难度、方形触控板、磁吸光标、「开/旗」两键、结束卡标题正确 |
 | 9 | 视频 | 默认无控制键，点一下出现，再点消失；全屏无悬浮退出条 |
@@ -236,7 +236,7 @@ Start-Sleep -Seconds 12      # 让系统把服务真正拉起来
 
 - 版本号在 `app/build.gradle` 的 `versionCode` / `versionName`，每次功能改动 +1。
 - 发布流程：改版本 → `assembleRelease` → 复制 APK 到 `podclassic/` → 提交源码与文档 → 打 GitHub Release 附 APK。
-- 当前：`versionCode 105 / versionName 1.5.71`。
+- 当前：`versionCode 120 / versionName 1.5.86`（Release: https://github.com/xejohv/PodClassic-XZs/releases/tag/v1.5.86）。
 
 ---
 
@@ -247,7 +247,7 @@ podclassic-git/
 ├─ app/src/main/java/io/github/xejohv/podclassicxzs/
 │  ├─ activity/    主 Activity
 │  ├─ view/        各页面（主菜单、播放器、文件、相机、视频、设置、电源菜单）
-│  ├─ game/        7 个游戏 + GameHost（HUD/结束卡/控制条/存档）
+│  ├─ game/        6 个游戏 + GameHost（HUD/结束卡/控制条/存档）
 │  ├─ gestures/    GestureService：三指手势、插线应答、电源菜单代点
 │  ├─ media/       音频会话与焦点
 │  ├─ base/        主题、配色、屏幕抽象
