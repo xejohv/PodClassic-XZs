@@ -275,8 +275,9 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         val oldShowScrollBar = scrollBar.visibility == View.VISIBLE
         scrollBar.setScrollBar(position, visibleCount, itemList.size)
         val newShowScrollBar = itemList.size > visibleCount
-        // 根据是否显示滚动条调整 RecyclerView 的 rightMargin
-        recyclerParams.rightMargin = if (newShowScrollBar) DEFAULT_PADDING else 0
+        // 滚动条槽位始终预留：显示/隐藏时不再改 rightMargin，
+        // 文字宽度自始至终一致，不会出现一滚动就横向缩一下的跳动
+        recyclerParams.rightMargin = DEFAULT_PADDING
         recyclerView.layoutParams = recyclerParams
         // 如果滚动条显示状态发生变化，刷新所有可见 item
         if (oldShowScrollBar != newShowScrollBar) {
@@ -358,11 +359,23 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     /** 量一次行高，把「一屏几行」算准，之后分页/滚动条/自动跟随都用它 */
     private fun measureVisibleRows() {
         if (measuredRows) return
+        // 首帧布局完成后直接同步算出行数，滚动条从第一帧就在正确位置；
+        // 之前只在 post 里算，首帧按 DEFAULT_MAX_SIZE 判成不需要滚动条，一滚才冒出来
+        val rowHeight = if (recyclerView.childCount > 0) recyclerView.getChildAt(0).height else 0
+        if (rowHeight > 0 && recyclerView.height > 0) {
+            val rows = (recyclerView.height / rowHeight).coerceAtLeast(1)
+            if (rows != visibleCount) {
+                visibleCount = rows
+                measuredRows = true
+                refreshList()
+            }
+            return
+        }
         recyclerView.post {
             if (recyclerView.childCount == 0) return@post
-            val rowHeight = recyclerView.getChildAt(0).height
-            if (rowHeight <= 0) return@post
-            val rows = (recyclerView.height / rowHeight).coerceAtLeast(1)
+            val rh = recyclerView.getChildAt(0).height
+            if (rh <= 0) return@post
+            val rows = (recyclerView.height / rh).coerceAtLeast(1)
             if (rows != visibleCount) {
                 visibleCount = rows
                 measuredRows = true
@@ -881,7 +894,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 rightTextWidth = 0
                 rightTextHeight = 0
                 // 没有 rightText 时，根据是否显示滚动条设置边距
-                layoutParams.rightMargin = if (showScrollBar) DEFAULT_PADDING else 0
+                layoutParams.rightMargin = DEFAULT_PADDING
                 leftText.layoutParams = layoutParams
             } else {
                 rightText.visibility = View.VISIBLE
