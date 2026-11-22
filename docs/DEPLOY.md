@@ -100,7 +100,7 @@ Select-String -LiteralPath build.log -Pattern "BUILD SUCCESSFUL|BUILD FAILED|^e:
 - 复制成带版本号的名字，便于回滚：
 
 ```powershell
-Copy-Item app\build\outputs\apk\release\app-release.apk ..\podclassic\PodClassicXZs_v1.5.86.apk -Force
+Copy-Item app\build\outputs\apk\release\app-release.apk ..\podclassic\PodClassicXZs_v1.5.87.apk -Force
 ```
 
 ### 2.1 构建常见坑
@@ -126,7 +126,7 @@ Copy-Item app\build\outputs\apk\release\app-release.apk ..\podclassic\PodClassic
 
 ```powershell
 adb devices      # 必须看到 <序列号>  device（不是 unauthorized）
-adb install -r ..\podclassic\PodClassicXZs_v1.5.86.apk
+adb install -r ..\podclassic\PodClassicXZs_v1.5.87.apk
 ```
 
 ### 3.2 绑定无障碍服务（核心步骤，必须做）
@@ -236,7 +236,7 @@ Start-Sleep -Seconds 12      # 让系统把服务真正拉起来
 
 - 版本号在 `app/build.gradle` 的 `versionCode` / `versionName`，每次功能改动 +1。
 - 发布流程：改版本 → `assembleRelease` → 复制 APK 到 `podclassic/` → 提交源码与文档 → 打 GitHub Release 附 APK。
-- 当前：`versionCode 120 / versionName 1.5.86`（Release: https://github.com/xejohv/PodClassic-XZs/releases/tag/v1.5.86）。
+- 当前：`versionCode 121 / versionName 1.5.87`（Release: https://github.com/xejohv/PodClassic-XZs/releases/tag/v1.5.86）。
 
 ---
 

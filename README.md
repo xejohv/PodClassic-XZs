@@ -4,7 +4,7 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 
 面向 **索尼 Xperia XZs（SO-03J 日版）** 的 iPod Classic 风格本地音乐播放器，由 PodClassic 一系改造而来，按「纯音乐播放器」整机场景重新调过。
 
-**当前版本：v1.5.86（versionCode 120）** — 下载见 [Releases](https://github.com/xejohv/PodClassic-XZs/releases/latest)，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
+**当前版本：v1.5.87（versionCode 121）** — 下载见 [Releases](https://github.com/xejohv/PodClassic-XZs/releases/latest)，逐版本变化见 [docs/CHANGELOG.md](./docs/CHANGELOG.md)。
 
 ---
 
@@ -100,7 +100,7 @@ An iPod Classic style local music player for **Sony Xperia XZs (SO-03J, docomo)*
 | 分辨率 | 1080×1920，density 480（densityDpi override 540） |
 | minSdk / targetSdk | 26 / 34 |
 | applicationId | `io.github.xejohv.podclassicxzs` |
-| 当前版本 | 1.5.86（versionCode 120） |
+| 当前版本 | 1.5.87（versionCode 121） |
 
 其它机型未验证；UI 的 overscan、触摸区、字号均按上述分辨率校准。
 
