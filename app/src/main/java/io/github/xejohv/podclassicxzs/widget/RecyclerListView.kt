@@ -50,6 +50,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     private var measuredRows = false
     private val adapter: ItemAdapter
     private val scrollBar = ScrollBar(context)
+    /** 滚动条是否真的需要：item 绑定边距要用它，必须和 updateScrollBar 的判定同源 */
+    private var scrollBarVisible = false
     private val indexView = android.widget.TextView(context)
     private val recyclerParams: LayoutParams
 
@@ -274,10 +276,18 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     private fun updateScrollBar() {
         val oldShowScrollBar = scrollBar.visibility == View.VISIBLE
         scrollBar.setScrollBar(position, visibleCount, itemList.size)
-        val newShowScrollBar = itemList.size > visibleCount
-        // 滚动条槽位始终预留：显示/隐藏时不再改 rightMargin，
-        // 文字宽度自始至终一致，不会出现一滚动就横向缩一下的跳动
-        recyclerParams.rightMargin = DEFAULT_PADDING
+        // 用「内容是否真的超出可视高度」判定，而不是 条目数 > 一屏行数：
+        // 主页菜单这类行高不一致（最后一行是 now playing 条）的列表会被按行数误判成可滚动，
+        // 于是多出滚动条、退出槽位，把「附加程序」裁掉。
+        val newShowScrollBar = if (recyclerView.height > 0) {
+            recyclerView.computeVerticalScrollRange() > recyclerView.height + 1
+        } else {
+            itemList.size > visibleCount
+        }
+        scrollBar.visibility = if (newShowScrollBar) View.VISIBLE else View.GONE
+        scrollBarVisible = newShowScrollBar
+        // 真可滚动才预留滚动条宽度；放得下的列表恢复满宽，回到改坏之前的排版
+        recyclerParams.rightMargin = if (newShowScrollBar) DEFAULT_PADDING else 0
         recyclerView.layoutParams = recyclerParams
         // 如果滚动条显示状态发生变化，刷新所有可见 item
         if (oldShowScrollBar != newShowScrollBar) {
@@ -363,7 +373,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         // 之前只在 post 里算，首帧按 DEFAULT_MAX_SIZE 判成不需要滚动条，一滚才冒出来
         val rowHeight = if (recyclerView.childCount > 0) recyclerView.getChildAt(0).height else 0
         if (rowHeight > 0 && recyclerView.height > 0) {
-            val rows = (recyclerView.height / rowHeight).coerceAtLeast(1)
+            val rows = ((recyclerView.height + rowHeight - 1) / rowHeight).coerceAtLeast(1)
             if (rows != visibleCount) {
                 visibleCount = rows
                 measuredRows = true
@@ -375,7 +385,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             if (recyclerView.childCount == 0) return@post
             val rh = recyclerView.getChildAt(0).height
             if (rh <= 0) return@post
-            val rows = (recyclerView.height / rh).coerceAtLeast(1)
+            val rows = ((recyclerView.height + rh - 1) / rh).coerceAtLeast(1)
             if (rows != visibleCount) {
                 visibleCount = rows
                 measuredRows = true
@@ -617,7 +627,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             if (actualIndex < itemList.size) {
                 val item = itemList[actualIndex]
                 // 判断是否显示滚动条（item 数量大于 MAX_SIZE 时显示）
-                val showScrollBar = itemList.size > visibleCount
+                val showScrollBar = scrollBarVisible
                 holder.bind(item, highlightEnabled && actualIndex == index, item.enable, item.rightText, showScrollBar)
                 // 设置 item 的点击监听
                 onItemCreated(actualIndex, holder.itemView as ItemView)
@@ -894,7 +904,7 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
                 rightTextWidth = 0
                 rightTextHeight = 0
                 // 没有 rightText 时，根据是否显示滚动条设置边距
-                layoutParams.rightMargin = DEFAULT_PADDING
+                layoutParams.rightMargin = if (showScrollBar) DEFAULT_PADDING else 0
                 leftText.layoutParams = layoutParams
             } else {
                 rightText.visibility = View.VISIBLE
