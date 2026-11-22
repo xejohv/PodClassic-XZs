@@ -3,6 +3,7 @@
     <string name="song">Music</string>
     <string name="photo">Photo</string>
     <string name="video">Video</string>
+    <string name="books">Books</string>
     <string name="file">File</string>
     <string name="extra_application">Extra Apps</string>
     <string name="settings">Settings</string>

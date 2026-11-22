@@ -10,6 +10,7 @@ object Strings {
     var SCORE: String = ""
     var PHOTO: String = ""
     var VIDEO: String = ""
+    var BOOKS: String = ""
     var EXTRA_APPLICATION: String = ""
     var FILE: String = ""
     var INTERNAL_STORAGE: String = ""
@@ -115,6 +116,7 @@ object Strings {
             THEME_WHITE = getString(R.string.theme_white)
             PHOTO = getString(R.string.photo)
             VIDEO = getString(R.string.video)
+            BOOKS = getString(R.string.books)
             EXTRA_APPLICATION = getString(R.string.extra_application)
             SETTINGS = getString(R.string.settings)
             SHUFFLE_PLAY = getString(R.string.shuffle_play)

@@ -3,6 +3,7 @@
     <string name="song">音乐</string>
     <string name="photo">照片</string>
     <string name="video">视频</string>
+    <string name="books">阅读</string>
     <string name="file">文件</string>
     <string name="extra_application">附加程序</string>
     <string name="settings">设置</string>

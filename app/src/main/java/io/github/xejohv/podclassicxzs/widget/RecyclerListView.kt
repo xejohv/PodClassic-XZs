@@ -52,6 +52,10 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
     private val scrollBar = ScrollBar(context)
     /** 滚动条是否真的需要：item 绑定边距要用它，必须和 updateScrollBar 的判定同源 */
     private var scrollBarVisible = false
+    /** 列表宽度够不够放滚动条槽位：主页左栏这类窄栏不放，避免文字被裁 */
+    private var isWideList = false
+    /** 单行高度（px）：判断「内容是否真的超出可视高度」要用它，ceil 行数会把刚好多半行的情况判成放得下 */
+    private var rowHeightPx = 0
     private val indexView = android.widget.TextView(context)
     private val recyclerParams: LayoutParams
 
@@ -275,19 +279,18 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
     private fun updateScrollBar() {
         val oldShowScrollBar = scrollBar.visibility == View.VISIBLE
-        scrollBar.setScrollBar(position, visibleCount, itemList.size)
-        // 用「内容是否真的超出可视高度」判定，而不是 条目数 > 一屏行数：
-        // 主页菜单这类行高不一致（最后一行是 now playing 条）的列表会被按行数误判成可滚动，
-        // 于是多出滚动条、退出槽位，把「附加程序」裁掉。
-        val newShowScrollBar = if (recyclerView.height > 0) {
-            recyclerView.computeVerticalScrollRange() > recyclerView.height + 1
-        } else {
-            itemList.size > visibleCount
-        }
+        val capacity = scrollCapacity()
+        scrollBar.setScrollBar(position, capacity, itemList.size)
+        // 窄栏（主页左栏那种整个列表只占屏幕三分之一）不预留滚动条槽位：
+        // 它本身放得下，硬扣 36px 会把「附加程序」「随机播放」裁掉。
+        // 整屏宽的列表只要确实分页（条目多于一屏）就常驻槽位，滚动时宽度不变。
+        val reserveSlot = isWideList
+        val paged = itemList.size > capacity
+        val newShowScrollBar = reserveSlot && paged
         scrollBar.visibility = if (newShowScrollBar) View.VISIBLE else View.GONE
         scrollBarVisible = newShowScrollBar
-        // 真可滚动才预留滚动条宽度；放得下的列表恢复满宽，回到改坏之前的排版
-        recyclerParams.rightMargin = if (newShowScrollBar) DEFAULT_PADDING else 0
+        // 整屏宽的列表槽位常驻（不随滚动条显隐变化，避免滚动时横向缩一下）
+        recyclerParams.rightMargin = if (reserveSlot) DEFAULT_PADDING else 0
         recyclerView.layoutParams = recyclerParams
         // 如果滚动条显示状态发生变化，刷新所有可见 item
         if (oldShowScrollBar != newShowScrollBar) {
@@ -295,6 +298,16 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         }
     }
 
+    /** 一屏能完整放下的行数（向下取整）：只要条目多过它，内容就真的超出可视高度，
+     *  底部那行会被切掉、列表能滑动，滚动条必须出现。
+     *  这里不能用 visibleCount（它是向上取整的渲染行数），9 条目 8.x 行会被算成 9 行，
+     *  结果音效这类 9 项设置页明明能滚却一根滚动条都没有。 */
+    private fun scrollCapacity(): Int {
+        val rh = rowHeightPx
+        val vh = recyclerView.height - recyclerView.paddingTop - recyclerView.paddingBottom
+        if (rh > 0 && vh > 0) return (vh / rh).coerceAtLeast(1)
+        return visibleCount
+    }
     private fun updateHighlight() {
         // 更新高亮状态
         recyclerView.post {
@@ -360,9 +373,17 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
+        // 第一次布局就定下「这列够不够宽」，之后不再变，滚动条槽位才能稳定
+        val wide = width >= Values.screenWidth * 0.6f
+        if (wide != isWideList) {
+            isWideList = wide
+            recyclerParams.rightMargin = if (wide) DEFAULT_PADDING else 0
+            recyclerView.layoutParams = recyclerParams
+        }
         if (changed) {
-            refreshList()
+            // 先量行高再刷新：刷新时会用行高算滚动条槽位，顺序反了首帧就没有滚动条
             measureVisibleRows()
+            refreshList()
         }
     }
 
@@ -373,6 +394,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
         // 之前只在 post 里算，首帧按 DEFAULT_MAX_SIZE 判成不需要滚动条，一滚才冒出来
         val rowHeight = if (recyclerView.childCount > 0) recyclerView.getChildAt(0).height else 0
         if (rowHeight > 0 && recyclerView.height > 0) {
+            rowHeightPx = rowHeight
+            updateScrollBar()
             val rows = ((recyclerView.height + rowHeight - 1) / rowHeight).coerceAtLeast(1)
             if (rows != visibleCount) {
                 visibleCount = rows
@@ -385,6 +408,8 @@ open class RecyclerListView(context: Context, private val MAX_SIZE: Int) : Frame
             if (recyclerView.childCount == 0) return@post
             val rh = recyclerView.getChildAt(0).height
             if (rh <= 0) return@post
+            rowHeightPx = rh
+            updateScrollBar()
             val rows = ((recyclerView.height + rh - 1) / rh).coerceAtLeast(1)
             if (rows != visibleCount) {
                 visibleCount = rows

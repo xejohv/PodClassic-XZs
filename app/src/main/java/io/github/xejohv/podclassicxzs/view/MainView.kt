@@ -28,6 +28,7 @@ import io.github.xejohv.podclassicxzs.base.ScreenView
 import io.github.xejohv.podclassicxzs.bean.Music
 import io.github.xejohv.podclassicxzs.service.MediaPresenter
 import io.github.xejohv.podclassicxzs.storage.SPManager
+import io.github.xejohv.podclassicxzs.util.ReaderBridge
 import io.github.xejohv.podclassicxzs.util.LiveData
 import io.github.xejohv.podclassicxzs.util.ThreadUtil
 import io.github.xejohv.podclassicxzs.util.FileUtil
@@ -397,6 +398,16 @@ class MainView(context: Context) : RelativeLayout(context), ScreenView {
                 }
             }, true),
 
+            RecyclerListView.Item(Strings.BOOKS, object : RecyclerListView.OnItemClickListener {
+                override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
+                    ReaderBridge.open(context)
+                    return true
+                }
+
+                override fun onItemLongClick(index: Int, listView: RecyclerListView): Boolean {
+                    return false
+                }
+            }, true),
             RecyclerListView.Item(Strings.FILE, object : RecyclerListView.OnItemClickListener {
                 override fun onItemClick(index: Int, listView: RecyclerListView): Boolean {
                     // 文件页是一张合并列表：手机存储/Music 与 SD 卡的内容平铺在一起，不再分两级

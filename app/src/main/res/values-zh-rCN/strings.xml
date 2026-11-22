@@ -3,6 +3,7 @@
     <string name="song">音乐</string>
     <string name="photo">照片</string>
     <string name="video">视频</string>
+    <string name="books">阅读</string>
     <string name="file">文件</string>
     <string name="extra_application">附加程序</string>
     <string name="settings">设置</string>
@@ -68,10 +69,10 @@
     <string name="show_lyric">显示歌词</string>
     <string name="show_info">显示歌手和专辑</string>
     <string name="auto_play">启动后自动播放</string>
-    <string name="reset_all_settings">Reset All Settings</string>
-    <string name="reset_all">Reset All</string>
-    <string name="cancel">Cancel</string>
-    <string name="reset">Reset</string>
+    <string name="reset_all_settings">恢复所有设置</string>
+    <string name="reset_all">恢复全部设置</string>
+    <string name="cancel">取消</string>
+    <string name="reset">恢复</string>
     <string name="about_me">关于</string>
     <string name="internal_storage">内部存储</string>
     <string name="sdcard">SD卡</string>
